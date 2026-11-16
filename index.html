@@ -28,8 +28,8 @@ a{color:var(--accent)}
 #backdrop{position:fixed;inset:0;z-index:0;pointer-events:none}
 #foil{width:100%;height:100%;display:block;opacity:.55}
 #collage{position:absolute;inset:0;overflow:hidden}
-#collage img{position:absolute;width:120px;aspect-ratio:5/7;object-fit:cover;border-radius:8px;opacity:.28;filter:saturate(1.1) blur(.4px);box-shadow:0 10px 30px #0009}
-#backdrop::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#0e111766 0,#0e1117e6 380px,var(--ink) 720px)}
+#collage img{position:absolute;width:150px;aspect-ratio:5/7;object-fit:cover;border-radius:10px;opacity:.6;filter:saturate(1.15);box-shadow:0 10px 30px #000c}
+#backdrop::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#0e111740 0,#0e1117b8 260px,#0e1117f2 520px,var(--ink) 760px)}
 .app{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:0 16px 110px}
 header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:22px 0 10px;flex-wrap:wrap}
 .brand h1{font:800 30px/1 var(--display);margin:0;letter-spacing:-.02em;text-wrap:balance}
@@ -212,8 +212,8 @@ function drawFoil(){
   for(let i=0;i<7;i++){ const cw=90+rnd()*60, ch=cw*1.4, px=rnd()*w, py=rnd()*h*.6; x.save(); x.translate(px,py); x.rotate((rnd()-.5)*.9); x.globalAlpha=.12+rnd()*.14; x.beginPath(); if(x.roundRect) x.roundRect(-cw/2,-ch/2,cw,ch,10); else x.rect(-cw/2,-ch/2,cw,ch); x.stroke(); x.restore(); }
 }
 function setCollage(urls){
-  const el=$("#collage"); const u=[...new Set(urls.filter(Boolean))].slice(0,9); const key=u.join("|"); if(el.dataset.k===key) return; el.dataset.k=key;
-  el.innerHTML=u.map((s,i)=>`<img src="${esc(s)}" alt="" onerror="this.remove()" style="left:${(i*11.5+2)%96}%;top:${[12,150,40,210,90,20,180,60,130][i]}px;transform:rotate(${[-9,6,-4,11,-13,8,-6,12,-3][i]}deg)">`).join("");
+  const el=$("#collage"); const u=[...new Set(urls.filter(Boolean))].slice(0,9); if(u.length>1){ let sd=u.length*7+S.view.length; for(let i=u.length-1;i>0;i--){ sd=(sd*9301+49297)%233280; const j=sd%(i+1); [u[i],u[j]]=[u[j],u[i]]; } } const key=u.join("|"); if(el.dataset.k===key) return; el.dataset.k=key;
+  el.innerHTML=u.map((s,i)=>`<img src="${esc(s)}" alt="" onerror="this.remove()" style="left:${[2,36,70,18,54,86,-4,44,76][i]}%;top:${[10,-20,24,200,180,210,400,390,410][i]}px;transform:rotate(${[-9,6,-4,11,-13,8,-6,12,-3][i]}deg)">`).join("");
 }
 
 /* ---------- render ---------- */
@@ -225,7 +225,8 @@ function render(){
   $("#view").innerHTML = v();
   $("#fab").style.display = S.readOnly ? "none" : "";
   drawFoil(); setSync();
-  const pool = S.view==="find" && S.search.results ? S.search.results.map(r=>r.imageUrl) : filtered().map(imgSrc);
+  const own=c=>c.photoId?"/_blob/"+c.photoId:(c.photo||""); let mine=filtered().filter(own); if(!mine.length&&S.f.tcg==="all") mine=cards().filter(own);
+  const pool = S.view==="find" && S.search.results && S.search.results.some(r=>r.imageUrl) ? S.search.results.map(r=>r.imageUrl) : [...mine.map(own), ...filtered().slice(0,12).map(c=>c.imageUrl||"")];
   setCollage(pool);
 }
 function filtered(){
