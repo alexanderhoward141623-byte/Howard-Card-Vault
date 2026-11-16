@@ -7,133 +7,168 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* Layout idea: a binder on a dark desk. One sticky tab strip, stacked sleeves of content, foil backdrop tinted by the TCG in focus. */
+/* Layout idea: a collector's app. Chase cards fan out behind a compact header, content sits in calm sleeves, navigation lives in a bottom bar on phones and a top bar on wide screens. */
 :root{
   color-scheme:dark;
-  --ink:#0e1117; --panel:#171c26; --panel2:#1f2633; --line:#2d3546;
-  --text:#eef1f6; --muted:#9aa5b8;
+  --ink:#0a0d13; --panel:#131822; --panel2:#1b2230; --line:#252d3c;
+  --text:#eef1f6; --muted:#93a0b5;
   --accent:#f28c28;
   --good:#4cc38a; --warn:#f2b84b; --bad:#ef6a6a; --unv:#b9a2f2;
   --display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
   --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
-  --r:14px;
+  --r:16px; --nav:64px;
 }
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
-body{background:var(--ink);color:var(--text);font:400 15px/1.45 var(--body);-webkit-text-size-adjust:100%}
+body{background:var(--ink);color:var(--text);font:400 15px/1.45 var(--body);-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
 img{max-width:100%}
 button,input,select,textarea{font:inherit;color:inherit}
+button{-webkit-tap-highlight-color:transparent}
 a{color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-#backdrop{position:fixed;inset:0;z-index:0;pointer-events:none}
-#foil{width:100%;height:100%;display:block;opacity:.55}
-#collage{position:absolute;inset:0;overflow:hidden}
-#collage img{position:absolute;width:150px;aspect-ratio:5/7;object-fit:cover;border-radius:10px;opacity:.6;filter:saturate(1.15);box-shadow:0 10px 30px #000c}
-#backdrop::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#0e111740 0,#0e1117b8 260px,#0e1117f2 520px,var(--ink) 760px)}
-.app{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:0 16px 110px}
-header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:22px 0 10px;flex-wrap:wrap}
-.brand h1{font:800 30px/1 var(--display);margin:0;letter-spacing:-.02em;text-wrap:balance}
+#backdrop{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+#foil{width:100%;height:100%;display:block;opacity:.4}
+#chase{position:absolute;top:-36px;left:50%;transform:translateX(-50%);display:flex;justify-content:center;align-items:flex-start;width:max-content}
+#chase img{width:clamp(150px,34vw,250px);aspect-ratio:63/88;object-fit:cover;border-radius:14px;margin:0 clamp(-46px,-7vw,-28px);box-shadow:0 18px 50px #000d;opacity:0;transition:opacity .6s}
+#chase img.in{opacity:.62}
+#backdrop::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#0a0d1326 0,#0a0d1399 190px,#0a0d13ee 330px,var(--ink) 460px)}
+.app{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 16px calc(var(--nav) + 96px)}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 0 12px}
+.brand h1{font:800 clamp(21px,6vw,27px)/1 var(--display);white-space:nowrap;margin:0;letter-spacing:-.02em;text-shadow:0 2px 18px #000a}
 .brand h1 span{color:var(--accent)}
-.brand p{margin:6px 0 0;color:var(--muted);font-size:13px}
-.sync{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--warn)}
+.brand p{margin:5px 0 0;color:var(--muted);font-size:12.5px;text-shadow:0 1px 8px #000}
+.sync{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px;background:#131822cc;border:1px solid var(--line);padding:5px 10px;border-radius:999px;white-space:nowrap;backdrop-filter:blur(8px)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--warn)}
 .dot.ok{background:var(--good)} .dot.off{background:var(--muted)}
-nav.tabs{position:sticky;top:0;z-index:5;display:flex;gap:6px;overflow-x:auto;padding:10px 0;background:linear-gradient(180deg,var(--ink) 70%,transparent);scrollbar-width:none}
-nav.tabs::-webkit-scrollbar{display:none}
-nav.tabs a{flex:0 0 auto;text-decoration:none;color:var(--muted);font-weight:600;padding:8px 13px;border-radius:999px;border:1px solid var(--line);background:#171c26cc}
-nav.tabs a.on{color:#14100a;background:var(--accent);border-color:var(--accent)}
-h2{font:800 21px/1.15 var(--display);margin:22px 0 10px;text-wrap:balance}
-h3{font:600 15px/1.2 var(--body);margin:0}
+nav.bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:8;height:calc(var(--nav) + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);display:flex;justify-content:center;background:#0d1118f2;border-top:1px solid var(--line);backdrop-filter:blur(14px)}
+nav.bottomnav .in{display:flex;width:min(560px,100%)}
+nav.bottomnav a{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;text-decoration:none;color:var(--muted);font-size:11px;font-weight:600}
+nav.bottomnav a svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.bottomnav a.on{color:var(--accent)}
+.subnav{display:flex;gap:4px;background:#131822d9;border:1px solid var(--line);border-radius:12px;padding:4px;margin:0 0 14px;backdrop-filter:blur(8px)}
+.subnav a{flex:1;text-align:center;text-decoration:none;color:var(--muted);font-weight:600;font-size:13.5px;padding:8px 6px;border-radius:9px;white-space:nowrap}
+.subnav a.on{background:var(--panel2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)}
+h2{font:800 22px/1.15 var(--display);margin:22px 0 12px;text-wrap:balance;letter-spacing:-.01em}
+h3{font:700 15px/1.25 var(--body);margin:0}
+.sec{font:700 12px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
 .muted{color:var(--muted)} .small{font-size:12.5px}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .grow{flex:1 1 auto;min-width:0}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
-.chip{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;padding:6px 11px;font-weight:600;font-size:13px;cursor:pointer}
-.chip.on{color:var(--text);border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.btn{border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:9px 13px;font-weight:600;cursor:pointer}
+.chips.scrollx{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
+.chips.scrollx::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;border:1px solid var(--line);background:#131822d9;color:var(--muted);border-radius:999px;padding:7px 12px;font-weight:600;font-size:13px;cursor:pointer;backdrop-filter:blur(8px)}
+.chip.on{color:#14100a;background:var(--accent);border-color:var(--accent)}
+.chip.ghost{border-style:dashed;background:transparent}
+.btn{border:1px solid var(--line);background:var(--panel2);border-radius:11px;padding:10px 14px;font-weight:600;cursor:pointer;text-decoration:none;color:var(--text);display:inline-block}
 .btn.pri{background:var(--accent);border-color:var(--accent);color:#14100a}
 .btn.ghost{background:transparent}
 .btn.danger{color:var(--bad)}
 .btn:disabled{opacity:.5;cursor:default}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
-.tile b{display:block;font:800 22px/1.1 var(--display);font-variant-numeric:tabular-nums}
-.tile span{font-size:12px;color:var(--muted)}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:720px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px}
+.tile b{display:block;font:800 23px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.tile span{font-size:12px;color:var(--muted);display:block;margin-top:3px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:15px}
 .stack{display:flex;flex-direction:column;gap:10px}
-.card{display:flex;gap:12px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--tc,var(--line));border-radius:var(--r);padding:10px;cursor:pointer;text-align:left;width:100%}
-.thumb{flex:0 0 54px;width:54px;aspect-ratio:5/7;border-radius:6px;background:linear-gradient(135deg,var(--panel2),#111620);position:relative;overflow:hidden;display:grid;place-items:center;color:var(--tc,var(--muted));font:800 13px var(--display)}
+.list{display:grid;gap:8px}
+@media(min-width:900px){.list{grid-template-columns:1fr 1fr}}
+.card{display:flex;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px 10px 10px;cursor:pointer;text-align:left;width:100%;color:inherit;position:relative;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tc,var(--line))}
+.thumb{flex:0 0 58px;width:58px;aspect-ratio:63/88;border-radius:7px;background:linear-gradient(150deg,color-mix(in srgb,var(--tc,#888) 30%,#10141c),#0d1118 70%);border:1px solid var(--line);position:relative;overflow:hidden;display:grid;place-items:center;color:color-mix(in srgb,var(--tc,#888) 75%,#fff);font:800 13px var(--display);letter-spacing:.04em}
 .thumb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.card .t{font-weight:700;overflow-wrap:anywhere}
-.pills{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
-.pill{font-size:11.5px;font-weight:700;padding:2px 7px;border-radius:6px;background:var(--panel2);color:var(--muted);white-space:nowrap}
+.card .t{font-weight:700;overflow-wrap:anywhere;line-height:1.25}
+.pills{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.pill{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--panel2);color:var(--muted);white-space:nowrap}
 .pill.good{color:#0c2418;background:var(--good)} .pill.warn{color:#2a1c02;background:var(--warn)} .pill.bad{color:#2b0b0b;background:var(--bad)}
-.pill.unv{color:var(--unv);background:transparent;border:1px dashed var(--unv)}
+.pill.unv{color:var(--unv);background:transparent;box-shadow:inset 0 0 0 1px var(--unv)}
 .pill.acc{color:#14100a;background:var(--tc,var(--accent))}
-.val{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.val b{display:block} .val small{color:var(--muted)}
-.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.val{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;flex:0 0 auto}
+.val b{display:block;font-size:15.5px} .val small{color:var(--muted)}
+.val .pill{display:inline-block;margin-top:3px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px}
 .hit{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;cursor:pointer;text-align:left;padding:0;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;color:inherit}
-.hit .art{aspect-ratio:5/7;background:radial-gradient(circle at 30% 20%,color-mix(in srgb,var(--tc) 45%,transparent),transparent 60%),linear-gradient(160deg,var(--panel2),#0f131b);position:relative;display:grid;place-items:center;font:800 26px var(--display);color:var(--tc)}
+.hit .art{aspect-ratio:63/88;background:radial-gradient(circle at 30% 20%,color-mix(in srgb,var(--tc) 40%,transparent),transparent 60%),linear-gradient(160deg,var(--panel2),#0d1118);position:relative;display:grid;place-items:center;font:800 20px var(--display);color:var(--tc)}
 .hit .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.hit .cap{padding:9px 10px}
-.empty{border:1px dashed var(--line);border-radius:var(--r);padding:20px;text-align:center;color:var(--muted)}
+.hit .cap{padding:10px 11px 12px}
+.hit .own{position:absolute;top:8px;right:8px;z-index:2}
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:24px 18px;text-align:center;color:var(--muted);background:#13182280}
 .bars{display:grid;gap:5px;margin-top:8px}
 .bar{display:grid;grid-template-columns:62px 1fr 78px;gap:8px;align-items:center;font-size:12.5px;font-variant-numeric:tabular-nums}
-.bar i{display:block;height:12px;border-radius:4px;background:var(--muted);min-width:2px}
+.bar i{display:block;height:11px;border-radius:999px;background:var(--muted);min-width:2px}
 .bar.b10 i{background:var(--accent)}
 .bar.est i{opacity:.6}
-.bar.unvb i{background:repeating-linear-gradient(45deg,var(--unv) 0 4px,transparent 4px 8px);border:1px dashed var(--unv)}
+.bar.unvb i{background:repeating-linear-gradient(45deg,var(--unv) 0 4px,transparent 4px 8px);box-shadow:inset 0 0 0 1px var(--unv)}
 .bar span:last-child{text-align:right}
 table{border-collapse:collapse;width:100%;font-size:13.5px}
-th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--muted);font-size:12px;font-weight:600}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{color:var(--muted);font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .scroll{overflow-x:auto}
-label.f{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}
-input[type=text],input[type=number],input[type=search],select,textarea{background:#10141c;border:1px solid var(--line);border-radius:9px;padding:9px 10px;width:100%;min-width:0;color:var(--text)}
+label.f,.f{display:flex;flex-direction:column;gap:5px;font-size:12.5px;color:var(--muted);font-weight:600}
+input[type=text],input[type=number],input[type=search],select,textarea{background:#0d1118;border:1px solid var(--line);border-radius:11px;padding:10px 11px;width:100%;min-width:0;color:var(--text);font-size:16px}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:0}
 textarea{min-height:70px;resize:vertical}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 @media(max-width:480px){.grid3{grid-template-columns:1fr 1fr}}
-.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.seg button{flex:1;border:0;background:#10141c;padding:9px 6px;font-weight:600;color:var(--muted);cursor:pointer;font-size:13px}
+.seg{display:flex;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#0d1118;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;padding:8px 6px;font-weight:600;color:var(--muted);cursor:pointer;font-size:13px;border-radius:8px}
 .seg button.on{background:var(--accent);color:#14100a}
 .check{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13.5px}
-.check input{width:18px;height:18px;accent-color:var(--accent)}
-#sheet{position:fixed;inset:0;z-index:20;display:none;background:#05070bcc;align-items:flex-end;justify-content:center}
+.check input{width:19px;height:19px;accent-color:var(--accent)}
+#sheet{position:fixed;inset:0;z-index:20;display:none;background:#04060ad9;align-items:flex-end;justify-content:center;backdrop-filter:blur(3px)}
 #sheet.open{display:flex}
-#sheet .box{background:var(--panel);border:1px solid var(--line);border-radius:18px 18px 0 0;width:min(680px,100%);max-height:92%;overflow:auto;padding:16px 16px 26px}
+#sheet .box{background:var(--panel);border:1px solid var(--line);border-radius:22px 22px 0 0;width:min(680px,100%);max-height:93%;overflow:auto;padding:10px 16px calc(22px + env(safe-area-inset-bottom,0px))}
+#sheet .box::before{content:"";display:block;width:42px;height:4px;border-radius:9px;background:var(--line);margin:0 auto 12px}
 #sheet .box>.stack{gap:12px}
-.fab{position:fixed;right:18px;bottom:22px;z-index:6;border-radius:999px;padding:14px 20px;font-weight:800;box-shadow:0 10px 30px #000a}
-#toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:30;background:#f3f5f9;color:#11151c;font-weight:600;padding:9px 14px;border-radius:10px;display:none;max-width:90%}
+#sheet .inset{background:#0d1118;border:1px solid var(--line);border-radius:14px;padding:13px;display:flex;flex-direction:column;gap:10px}
+.fab{position:fixed;right:max(16px,calc(50% - 524px));bottom:calc(var(--nav) + 16px + env(safe-area-inset-bottom,0px));z-index:7;width:56px;height:56px;border-radius:50%;padding:0;font:800 30px/1 var(--display);box-shadow:0 10px 28px #000b;display:grid;place-items:center}
+#toast{position:fixed;left:50%;bottom:calc(var(--nav) + 84px);transform:translateX(-50%);z-index:30;background:#f3f5f9;color:#11151c;font-weight:600;padding:10px 15px;border-radius:12px;display:none;max-width:90%;box-shadow:0 8px 30px #000a}
 .steps{display:flex;flex-direction:column;gap:8px}
-.step{display:flex;gap:10px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px}
+.step{display:flex;gap:11px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
 .step input{width:20px;height:20px;margin-top:2px;accent-color:var(--accent);flex:0 0 auto}
 .emblem{display:grid;place-items:center;aspect-ratio:16/10;position:relative;overflow:hidden}
-.emblem b{font:800 34px/1 var(--display);color:#fff;letter-spacing:.02em;text-shadow:0 2px 14px #0008}
-.emblem img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:12px;background:#0e1117d9}
-.sheetprev{position:relative;max-width:420px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.emblem b{font:800 30px/1 var(--display);color:#fff;letter-spacing:.02em;text-shadow:0 2px 14px #0008}
+.emblem img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:14px;background:radial-gradient(circle at 50% 40%,#232c3c,#0d1118)}
+.sethead{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.sethead .emblem{width:170px;border-radius:14px;border:1px solid var(--line);flex:0 0 auto}
+.sheetprev{position:relative;max-width:420px;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
 .sheetprev img{display:block;width:100%}
 .gridlines{position:absolute;inset:0;display:grid}
 .gridlines span{border:1px dashed #fffc;display:grid;place-items:start;padding:3px 5px;font:700 12px var(--body);color:#fff;text-shadow:0 1px 3px #000}
-.preview{width:120px;aspect-ratio:5/7;object-fit:cover;border-radius:8px;border:1px solid var(--line)}
-progress{width:100%;accent-color:var(--accent)}
-.note{border-left:3px solid var(--unv);padding:8px 12px;background:#b9a2f214;border-radius:0 10px 10px 0;font-size:13.5px}
-@media (prefers-reduced-motion:no-preference){.card,.hit,.chip,.btn{transition:transform .12s,border-color .12s}.card:active,.hit:active{transform:scale(.99)}}
+.preview{width:120px;aspect-ratio:63/88;object-fit:cover;border-radius:9px;border:1px solid var(--line)}
+progress{width:100%;accent-color:var(--accent);height:8px}
+.note{border-left:3px solid var(--unv);padding:9px 12px;background:#b9a2f214;border-radius:0 12px 12px 0;font-size:13.5px}
+@media(min-width:900px){
+  :root{--nav:0px}
+  .app{padding-bottom:80px}
+  header.top{padding-top:22px}
+  nav.bottomnav{position:sticky;top:0;bottom:auto;height:auto;border:0;background:linear-gradient(180deg,var(--ink) 60%,transparent);backdrop-filter:none;justify-content:flex-start;padding:8px 0 14px;margin:0}
+  nav.bottomnav .in{width:auto;gap:6px}
+  nav.bottomnav a{flex:0 0 auto;flex-direction:row;gap:8px;font-size:14px;padding:9px 15px;border-radius:999px;border:1px solid var(--line);background:#131822d9}
+  nav.bottomnav a svg{width:18px;height:18px}
+  nav.bottomnav a.on{background:var(--accent);border-color:var(--accent);color:#14100a}
+  .subnav{max-width:520px}
+  .fab{bottom:28px}
+  #toast{bottom:100px}
+}
+@media (prefers-reduced-motion:no-preference){.card,.hit,.chip,.btn{transition:transform .12s,border-color .12s,background .12s}.card:active,.hit:active{transform:scale(.985)}.card:hover,.hit:hover{border-color:#3a4558}}
 </style>
 </head>
 <body>
-<div id="backdrop"><canvas id="foil"></canvas><div id="collage"></div></div>
+<div id="backdrop"><canvas id="foil"></canvas><div id="chase"></div></div>
 <div class="app">
   <header class="top">
-    <div class="brand"><h1>Howard <span>Card Vault</span></h1><p id="tagline">Rips, hits and values for the whole family's binders.</p></div>
+    <div class="brand"><h1>Howard <span>Card Vault</span></h1><p id="tagline">Rips, hits and values for the family binders.</p></div>
     <div class="sync"><i class="dot" id="syncDot"></i><span id="syncText">Starting up</span></div>
   </header>
-  <nav class="tabs" id="tabs"></nav>
+  <nav class="bottomnav" id="tabs" aria-label="Sections"></nav>
   <main id="view"></main>
 </div>
-<button class="btn pri fab" id="fab" data-act="new-card">+ Add card</button>
+<button class="btn pri fab" id="fab" data-act="new-card" aria-label="Add a card">+</button>
 <div id="sheet"><div class="box" id="sheetBox"></div></div>
 <div id="toast" role="status"></div>
 <script src="data/reference.js"></script>
@@ -145,7 +180,7 @@ const VIEWS = [["collection","Collection"],["rips","Rip log"],["hits","Hits"],["
 const REASONS = ["Artwork","Nostalgia","Favorite character","Set building","Value hold","Kid's pick"];
 const S = {mode:"starting", cards:new Map(), products:new Map(), watch:new Map(), settings:{owners:["Alexander"],gradeFee:null},
   view:"collection", f:{tcg:"all",owner:"all",decision:"all",q:""}, findTab:"search", search:{q:"",tcg:"pokemon",results:null,busy:false,note:""},
-  scan:{busy:false,msg:""}, sheet:null, liveSets:{}, setTcg:"naruto", imp:{rows:null,busy:false,done:0,total:0,msg:""}, serialCard:"", serialTicks:{}, net:"unknown", stale:false, readOnly:false};
+  scan:{busy:false,msg:""}, sheet:null, liveSets:{}, setTcg:"pokemon", setOpen:null, setMore:60, imp:{rows:null,busy:false,done:0,total:0,msg:""}, serialCard:"", serialTicks:{}, net:"unknown", stale:false, readOnly:false};
 let db=null, assets=null, sample=null, downloads=null, sampleImages=false;
 
 /* ---------- helpers ---------- */
@@ -158,8 +193,10 @@ const tcgOf = id => REF.tcgs.find(t=>t.id===id) || REF.tcgs[REF.tcgs.length-1];
 const cards = () => [...S.cards.values()];
 const products = () => [...S.products.values()].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
 function toast(m){ const t=$("#toast"); t.textContent=m; t.style.display="block"; clearTimeout(toast.t); toast.t=setTimeout(()=>t.style.display="none",2600); }
-function imgSrc(c){ return c.photoId ? "/_blob/"+c.photoId : (c.photo || c.imageUrl || ""); }
-function thumb(c){ const s=imgSrc(c); const ini=esc((c.rarity||tcgOf(c.tcg).label).slice(0,4)); return `<span class="thumb">${ini}${s?`<img src="${esc(s)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>`; }
+const SHORT={naruto:"NK",pokemon:"PK",yugioh:"YG",kpdh:"KP",onepiece:"OP",other:"TC"};
+const HOSTED="https://alexanderhoward141623-byte.github.io/Howard-Card-Vault/";
+function imgSrc(c,small){ if(c.photoId&&S.mode==="cloud") return "/_blob/"+c.photoId; let u=c.photo||c.imageUrl||""; if(small&&u) u=u.replace(/(images\.scrydex\.com\/.+)\/large$/,"$1/small").replace(/\/high\.webp$/,"/low.webp"); return u; }
+function thumb(c){ const s=imgSrc(c,true); return `<span class="thumb">${SHORT[c.tcg]||"TC"}${s?`<img src="${esc(s)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>`; }
 function valStatusPill(st){ return st==="verified" ? "" : st==="estimate" ? `<span class="pill">estimate</span>` : `<span class="pill unv">unverified</span>`; }
 function serialPill(c){ if(c.serial==="yes") return `<span class="pill acc">#${esc(c.serialNo||"?")}/${esc(c.serialRun||"?")}</span>`; if(c.serial==="unverified") return `<span class="pill unv">serial unverified</span>`; return ""; }
 function decisionPill(c){ const d=c.decision||"undecided"; if(d==="undecided") return `<span class="pill">undecided</span>`; const why=(d==="keep"&&c.reasons&&c.reasons.length)?" · "+esc(c.reasons.join(", ")):""; return `<span class="pill ${d==="keep"?"good":d==="sell"?"warn":""}">${d}${why}</span>`; }
@@ -181,7 +218,7 @@ async function del(coll, id){
 }
 async function saveSettings(){ if(S.mode==="cloud"){ try{ await db.doc("meta/settings").set({...S.settings}); }catch(e){ writeFail(e); } } else { saveLocal(); render(); } }
 function writeFail(e){ const c=e&&e.code; if(c==="invalid_argument"){ S.readOnly=true; toast("You can view this vault but not change it."); } else if(c==="quota_exceeded") toast("The vault is full. Remove some cards first."); else if(c==="resource_exhausted") toast("Saving too fast. Wait a moment and try again."); else toast("Could not save. Check your connection and try again."); }
-function setSync(){ const d=$("#syncDot"), t=$("#syncText"); if(S.mode==="cloud"){ d.className="dot "+(S.stale?"":"ok"); t.textContent=S.stale?"Saved copy, reconnecting":"Synced across your devices"; } else if(S.mode==="local"){ d.className="dot off"; t.textContent="Saved on this device only"; } else { d.className="dot"; t.textContent="Starting up"; } }
+function setSync(){ const d=$("#syncDot"), t=$("#syncText"); if(S.mode==="cloud"){ d.className="dot "+(S.stale?"":"ok"); t.textContent=S.stale?"Reconnecting":"Synced"; } else if(S.mode==="local"){ d.className="dot off"; t.textContent="This device only"; } else { d.className="dot"; t.textContent="Starting up"; } }
 
 async function boot(){
   window.addEventListener("hashchange", route); route();
@@ -199,7 +236,7 @@ async function boot(){
     cl.use("sample").then(async s=>{ sample=s; if(s){ try{ const l=await s.limits(); sampleImages=!!(l&&l.images); }catch(e){} } render(); }).catch(()=>{});
   } else { S.mode="local"; loadLocal(); setSync(); render(); }
 }
-function route(){ const h=(location.hash||"").replace("#",""); S.view = VIEWS.some(v=>v[0]===h) ? h : "collection"; if(S.mode!=="starting") render(); window.scrollTo(0,0); }
+function route(){ const h=(location.hash||"").replace("#",""); S.view = VIEWS.some(v=>v[0]===h) ? h : "collection"; if(S.view!=="sets") S.setOpen=null; if(S.mode!=="starting") render(); window.scrollTo(0,0); }
 
 /* ---------- backdrop ---------- */
 function accent(){ return S.f.tcg!=="all" ? tcgOf(S.f.tcg).accent : (S.view==="find" ? tcgOf(S.search.tcg).accent : S.view==="sets" ? tcgOf(S.setTcg).accent : "#f28c28"); }
@@ -211,23 +248,46 @@ function drawFoil(){
   x.restore(); x.globalAlpha=.5; x.strokeStyle=a; x.lineWidth=1.5;
   for(let i=0;i<7;i++){ const cw=90+rnd()*60, ch=cw*1.4, px=rnd()*w, py=rnd()*h*.6; x.save(); x.translate(px,py); x.rotate((rnd()-.5)*.9); x.globalAlpha=.12+rnd()*.14; x.beginPath(); if(x.roundRect) x.roundRect(-cw/2,-ch/2,cw,ch,10); else x.rect(-cw/2,-ch/2,cw,ch); x.stroke(); x.restore(); }
 }
-function setCollage(urls){
-  const el=$("#collage"); const u=[...new Set(urls.filter(Boolean))].slice(0,9); if(u.length>1){ let sd=u.length*7+S.view.length; for(let i=u.length-1;i>0;i--){ sd=(sd*9301+49297)%233280; const j=sd%(i+1); [u[i],u[j]]=[u[j],u[i]]; } } const key=u.join("|"); if(el.dataset.k===key) return; el.dataset.k=key;
-  el.innerHTML=u.map((s,i)=>`<img src="${esc(s)}" alt="" onerror="this.remove()" style="left:${[2,36,70,18,54,86,-4,44,76][i]}%;top:${[10,-20,24,200,180,210,400,390,410][i]}px;transform:rotate(${[-9,6,-4,11,-13,8,-6,12,-3][i]}deg)">`).join("");
+/* Chase cards for the game in focus, fanned behind the header. Art loads live from public card databases, so it only appears where outside images are allowed. */
+const TD="https://api.tcgdex.net/v2/en";
+const API={chase:{},pick:{},setCards:{},busy:{},setNames:null};
+async function getJSON(u){ const c=new AbortController(), t=setTimeout(()=>c.abort(),12000); try{ const r=await fetch(u,{signal:c.signal}); if(!r.ok) throw new Error("http "+r.status); return await r.json(); } finally{ clearTimeout(t); } }
+const normId=v=>String(v||"").toLowerCase().replace(/pt/g,".").replace(/(^|[^0-9.])0+(\d)/g,"$1$2");
+const normNum=v=>String(v||"").split("/")[0].trim().toLowerCase().replace(/^0+(?=.)/,"");
+const normSet=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+function focusTcg(){ const t = S.view==="sets" ? S.setTcg : S.view==="find" ? S.search.tcg : S.f.tcg; return t==="all" ? "pokemon" : t; }
+async function loadChase(tcg){
+  if(API.chase[tcg]||API.busy["c"+tcg]||S.net==="blocked") return; API.busy["c"+tcg]=1;
+  try{ let list=[];
+    if(tcg==="pokemon"){ const j=await getJSON(TD+"/cards?rarity=Special%20illustration%20rare&sort:field=set.releaseDate&sort:order=DESC&pagination:itemsPerPage=30"); list=j.filter(c=>c.image).map(c=>({src:c.image+"/high.webp",name:c.name})); }
+    else if(tcg==="yugioh"){ const names=["Blue-Eyes White Dragon","Dark Magician","Black Luster Soldier","Red-Eyes Black Dragon","Exodia the Forbidden One","Dark Magician Girl","Slifer the Sky Dragon"]; const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?name="+encodeURIComponent(names.join("|"))); list=(j.data||[]).map(c=>({src:c.card_images[0].image_url,name:c.name})); }
+    API.chase[tcg]=list; if(list.length) S.net="open";
+  }catch(e){ API.chase[tcg]=[]; if(S.net==="unknown") S.net="blocked"; }
+  API.busy["c"+tcg]=0; drawChase();
+}
+function drawChase(){
+  const el=$("#chase"), tcg=focusTcg(), list=API.chase[tcg];
+  if(!list){ if(tcg==="pokemon"||tcg==="yugioh") loadChase(tcg); if(el.dataset.k!==""){ el.dataset.k=""; el.innerHTML=""; } return; }
+  if(!API.pick[tcg]){ const a=[...list]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } API.pick[tcg]=a.slice(0,5); }
+  const pick=API.pick[tcg], key=tcg+pick.length; if(el.dataset.k===key) return; el.dataset.k=key;
+  const mid=(pick.length-1)/2;
+  el.innerHTML=pick.map((c,i)=>`<img src="${esc(c.src)}" alt="" onload="this.classList.add('in')" onerror="this.remove()" style="transform:rotate(${((i-mid)*7).toFixed(1)}deg) translateY(${Math.round(Math.abs(i-mid)*20)}px);z-index:${10-Math.round(Math.abs(i-mid)*2)}">`).join("");
 }
 
 /* ---------- render ---------- */
+const ICON={collection:'<rect x="7" y="3" width="12" height="16" rx="2"/><path d="M5 7v12a2 2 0 0 0 2 2h8"/>',rips:'<path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/>',find:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/>',hot:'<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',sets:'<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>'};
+const NAV=[["collection","Vault",["collection","hits","value"]],["rips","Rips",["rips","serials"]],["find","Search",["find"]],["hot","Market",["hot"]],["sets","Sets",["sets"]]];
+const SUB={collection:[["collection","All cards"],["hits","Hits"],["value","Raw vs BGS 10"]],rips:[["rips","Rip log"],["serials","Serial check"]]};
 function sheetOpen(){ return $("#sheet").classList.contains("open"); }
 function render(){
   document.documentElement.style.setProperty("--accent", accent());
-  $("#tabs").innerHTML = VIEWS.map(([id,l])=>`<a href="#${id}" class="${S.view===id?"on":""}">${l}</a>`).join("");
+  const grp=NAV.find(n=>n[2].includes(S.view))||NAV[0];
+  $("#tabs").innerHTML = `<div class="in">${NAV.map(([id,l])=>`<a href="#${id}" class="${grp[0]===id?"on":""}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON[id]}</svg>${l}</a>`).join("")}</div>`;
   const v = {collection:vCollection, rips:vRips, hits:vHits, value:vValue, find:vFind, hot:vHot, sets:vSets, serials:vSerials}[S.view];
-  $("#view").innerHTML = v();
+  const sub = SUB[grp[0]] ? `<div class="subnav">${SUB[grp[0]].map(([id,l])=>`<a href="#${id}" class="${S.view===id?"on":""}">${l}</a>`).join("")}</div>` : "";
+  $("#view").innerHTML = sub + v();
   $("#fab").style.display = S.readOnly ? "none" : "";
-  drawFoil(); setSync();
-  const own=c=>c.photoId?"/_blob/"+c.photoId:(c.photo||""); let mine=filtered().filter(own); if(!mine.length&&S.f.tcg==="all") mine=cards().filter(own);
-  const pool = S.view==="find" && S.search.results && S.search.results.some(r=>r.imageUrl) ? S.search.results.map(r=>r.imageUrl) : [...mine.map(own), ...filtered().slice(0,12).map(c=>c.imageUrl||"")];
-  setCollage(pool);
+  drawFoil(); setSync(); drawChase();
 }
 function filtered(){
   const q=S.f.q.trim().toLowerCase();
@@ -239,8 +299,8 @@ function filterBar(){
   const t = [["all","All games"], ...REF.tcgs.filter(t=>used.has(t.id)||["naruto","pokemon","yugioh","kpdh"].includes(t.id)).map(t=>[t.id,t.label])];
   const o = [["all","Everyone"], ...S.settings.owners.map(n=>[n,n])];
   return `<div class="stack" style="gap:8px">
-    <div class="chips">${t.map(([id,l])=>`<button class="chip ${S.f.tcg===id?"on":""}" data-act="f-tcg" data-v="${id}">${esc(l)}</button>`).join("")}</div>
-    <div class="chips">${o.map(([id,l])=>`<button class="chip ${S.f.owner===id?"on":""}" data-act="f-owner" data-v="${esc(id)}">${esc(l)}</button>`).join("")}<button class="chip" data-act="add-owner">+ Collector</button></div>
+    <div class="chips scrollx">${t.map(([id,l])=>`<button class="chip ${S.f.tcg===id?"on":""}" data-act="f-tcg" data-v="${id}">${esc(l)}</button>`).join("")}</div>
+    <div class="chips scrollx">${o.map(([id,l])=>`<button class="chip ${S.f.owner===id?"on":""}" data-act="f-owner" data-v="${esc(id)}">${esc(l)}</button>`).join("")}<button class="chip ghost" data-act="add-owner">+ Collector</button></div>
   </div>`;
 }
 function totals(list){ const t={n:0,raw:0,rawUnv:0,bgs:0,noVal:0,unvSerial:0}; list.forEach(c=>{ const q=c.qty||1; t.n+=q; if(c.raw!=null){ if(c.rawStatus==="unverified") t.rawUnv+=c.raw*q; else t.raw+=c.raw*q; } else t.noVal++; if(c.bgs!=null) t.bgs+=c.bgs*q; if(c.serial==="unverified") t.unvSerial++; }); return t; }
@@ -264,7 +324,7 @@ function vCollection(){
   <div class="row" style="margin:14px 0 10px"><input type="search" id="q" placeholder="Filter this list by name, set, number" value="${esc(S.f.q)}" class="grow">
     <select id="fDecision" style="width:auto"><option value="all">Any decision</option>${["undecided","keep","trade","sell"].map(d=>`<option ${S.f.decision===d?"selected":""}>${d}</option>`).join("")}</select></div>
   ${RC&&S.mode!=="starting"&&!S.readOnly&&(RCS.busy||RCS.msg||rcPending().length===RC.rows.length)?`<div class="panel stack" style="margin-bottom:12px;border-color:var(--accent)"><b>Your Rare Candy library is ready</b><span class="muted">${RC.rows.length} Pokémon cards read from the Pilot007 profile on ${esc(RC.asOf)}.</span>${rcButton()}</div>`:""}
-  ${list.length? `<div class="stack">${shown.map(cardRow).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}`
+  ${list.length? `<div class="list">${shown.map(cardRow).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}`
     : `<div class="empty">${cards().length? "Nothing matches these filters." : S.mode==="starting" ? "Opening the vault." : "No cards yet. Tap Add card, scan one, or log a pull from the Rip log."}</div>`}
   <div class="row" style="margin-top:18px"><button class="btn" data-act="export-json">Export backup</button><button class="btn" data-act="export-csv">Export CSV</button></div>`;
 }
@@ -299,7 +359,7 @@ function vRips(){
 /* ---------- hits ---------- */
 function vHits(){
   const list=filtered().filter(c=>c.isHit);
-  return `${filterBar()}<h2>Hit gallery</h2>${list.length?`<div class="gallery">${list.map(c=>{ const tc=tcgOf(c.tcg), s=imgSrc(c); return `<button class="hit" style="--tc:${tc.accent}" data-act="edit-card" data-id="${c.id}"><span class="art">${esc(c.rarity||"HIT")}${s?`<img src="${esc(s)}" alt="${esc(c.name||"")}" loading="lazy" onerror="this.remove()">`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(c.name||c.character||"Unnamed")}</b><span class="pills">${serialPill(c)}${decisionPill(c)}${c.raw!=null?`<span class="pill">${money(c.raw)}</span>`:""}</span></span></button>`; }).join("")}</div>`
+  return `${filterBar()}<h2>Hit gallery</h2>${list.length?`<div class="gallery">${list.map(c=>{ const tc=tcgOf(c.tcg), s=imgSrc(c,true); return `<button class="hit" style="--tc:${tc.accent}" data-act="edit-card" data-id="${c.id}"><span class="art">${esc(c.rarity||"HIT")}${s?`<img src="${esc(s)}" alt="${esc(c.name||"")}" loading="lazy" onerror="this.remove()">`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(c.name||c.character||"Unnamed")}</b><span class="pills">${serialPill(c)}${decisionPill(c)}${c.raw!=null?`<span class="pill">${money(c.raw)}</span>`:""}</span></span></button>`; }).join("")}</div>`
    : `<div class="empty">No hits here yet. Open any card and switch on "Show in hit gallery", or scan a pull and add its photo.</div>`}`;
 }
 
@@ -334,9 +394,9 @@ function findSearch(){
   return `<div class="row"><input type="search" id="sq" class="grow" placeholder="Card name, character or number" value="${esc(s.q)}">
     <select id="stcg" style="width:auto">${REF.tcgs.map(t=>`<option value="${t.id}" ${s.tcg===t.id?"selected":""}>${esc(t.label)}</option>`).join("")}</select>
     <button class="btn pri" data-act="do-search" ${s.busy?"disabled":""}>${s.busy?"Searching":"Search"}</button></div>
-  ${q?`<h3 style="margin:16px 0 8px">In your vault (${mine.length})</h3>${mine.length?`<div class="stack">${mine.map(cardRow).join("")}</div>`:`<p class="muted">Nothing in the vault matches.</p>`}`:`<p class="muted" style="margin-top:12px">Search checks your own vault first, then the card catalog for the game you pick.</p>`}
+  ${q?`<h3 style="margin:16px 0 8px">In your vault (${mine.length})</h3>${mine.length?`<div class="list">${mine.map(cardRow).join("")}</div>`:`<p class="muted">Nothing in the vault matches.</p>`}`:`<p class="muted" style="margin-top:12px">Search checks your own vault first, then the card catalog for the game you pick.</p>`}
   ${s.note?`<p class="note" style="margin-top:14px">${esc(s.note)}</p>`:""}
-  ${s.results?`<h3 style="margin:16px 0 8px">Catalog (${s.results.length})</h3>${s.results.length?`<div class="gallery">${s.results.map((r,i)=>`<div class="hit" style="--tc:${tcgOf(r.tcg).accent};cursor:default"><span class="art">${esc((r.rarity||"").slice(0,12))}${r.imageUrl?`<img src="${esc(r.imageUrl)}" alt="${esc(r.name)}" loading="lazy" onerror="this.remove()">`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(r.name)}</b><span class="muted small" style="display:block">${esc([r.set,r.number].filter(Boolean).join(" · "))}</span>${r.raw!=null?`<span class="pill">${money(r.raw)} est.</span>`:""}<span style="display:block;margin-top:8px"><button class="btn pri" data-act="add-result" data-i="${i}">Add</button></span></span></div>`).join("")}</div>`:`<p class="muted">No catalog matches. You can still add it by hand.</p>`}`:""}
+  ${s.results?`<h3 style="margin:16px 0 8px">Catalog (${s.results.length})</h3>${s.results.length?`<div class="gallery">${s.results.map((r,i)=>`<div class="hit" style="--tc:${tcgOf(r.tcg).accent};cursor:default"><span class="art">${esc(SHORT[r.tcg]||"")}${r.img||r.imageUrl?`<img src="${esc(r.img||r.imageUrl)}" alt="${esc(r.name)}" loading="lazy" onerror="this.remove()">`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(r.name)}</b><span class="muted small" style="display:block">${esc([r.set,r.number].filter(Boolean).join(" · "))}</span>${r.raw!=null?`<span class="pill">${money(r.raw)} est.</span>`:""}<span style="display:block;margin-top:8px"><button class="btn pri" data-act="add-result" data-i="${i}">Add</button></span></span></div>`).join("")}</div>`:`<p class="muted">No catalog matches. You can still add it by hand.</p>`}`:""}
   <p style="margin-top:16px"><button class="btn" data-act="new-card">Add a card by hand</button></p>`;
 }
 function findScan(){
@@ -403,9 +463,16 @@ async function sheetAdd(){
   }
   sh.busy=false; sh.msg=`Added ${added} new card${added===1?"":"s"}${bumped?` and one more copy of ${bumped} you already had`:""}.`; if(sh.cells.every(c=>!c.on)) sh.cells=null; render();
 }
+async function restoreBackup(file){
+  if(!file) return; let d; try{ d=JSON.parse(await file.text()); }catch(e){ toast("That file is not a vault backup."); return; }
+  const groups=[["cards",d.cards],["products",d.products],["watch",d.watch]].filter(g=>Array.isArray(g[1])); if(!groups.length){ toast("That file is not a vault backup."); return; }
+  S.imp.busy=true; S.imp.done=0; S.imp.total=groups.reduce((a,g)=>a+g[1].length,0); S.imp.msg="Restoring."; render(); let ok=0;
+  for(const [coll,arr] of groups){ for(const o of arr){ if(o&&o.id){ if(S.mode==="local"){ mapOf[coll]().set(o.id,o); ok++; } else { const {id,...data}=o; try{ await db.doc(coll+"/"+id).set(data); ok++; }catch(e){ if(e&&e.code==="resource_exhausted") await new Promise(z=>setTimeout(z,2500)); } } } S.imp.done++; } }
+  if(S.mode==="local") saveLocal(); S.imp.busy=false; S.imp.msg=`Restored ${ok} items from the backup.`; render();
+}
 function findImport(){
   const im=S.imp;
-  return `<div class="panel stack"><b>Rare Candy library</b><span class="muted">Rare Candy has no export button, so Claude reads your public profile (Pilot007) and loads it here. To refresh after you scan more cards there, ask Claude in chat to "refresh my Rare Candy import".</span><span class="pills"><span class="pill">${cards().filter(c=>c.source==="rarecandy").length} cards from Rare Candy in the vault</span>${RC?`<span class="pill">${RC.rows.length} cards read from your profile on ${esc(RC.asOf)}</span>`:""}</span>${rcButton()}</div>
+  return `<div class="panel stack" style="margin-bottom:12px"><b>Move your vault between copies</b><span class="muted">Use Export backup on the Vault tab in one copy, then pick that file here in the other. Photos taken inside Claude stay with the Claude copy.</span><input type="file" id="bakFile" accept=".json,application/json"></div><div class="panel stack"><b>Rare Candy library</b><span class="muted">Rare Candy has no export button, so Claude reads your public profile (Pilot007) and loads it here. To refresh after you scan more cards there, ask Claude in chat to "refresh my Rare Candy import".</span><span class="pills"><span class="pill">${cards().filter(c=>c.source==="rarecandy").length} cards from Rare Candy in the vault</span>${RC?`<span class="pill">${RC.rows.length} cards read from your profile on ${esc(RC.asOf)}</span>`:""}</span>${rcButton()}</div>
   <div class="panel stack" style="margin-top:12px"><b>Import a CSV or pasted list</b><span class="muted">Works with exports from most collection apps. Columns it understands: name, set, number, quantity, condition, rarity, price.</span>
     <div class="grid2"><label class="f">Game<select id="impTcg">${REF.tcgs.map(t=>`<option value="${t.id}" ${t.id==="pokemon"?"selected":""}>${esc(t.label)}</option>`).join("")}</select></label><label class="f">Collector<select id="impOwner">${S.settings.owners.map(o=>`<option>${esc(o)}</option>`).join("")}</select></label></div>
     <input type="file" id="impFile" accept=".csv,.tsv,.txt,text/csv,text/plain">
@@ -456,25 +523,58 @@ function vHot(){
 /* ---------- sets ---------- */
 function hue(str){ let h=0; for(const ch of str) h=(h*31+ch.charCodeAt(0))%360; return h; }
 function emblem(name,logo){ const h=hue(name), ini=name.replace(/[^A-Za-z0-9 ]/g,"").split(/\s+/).filter(Boolean).slice(0,4).map(w=>/^\d+$/.test(w)?w:w[0].toUpperCase()).join(""); return `<span class="emblem" style="background:radial-gradient(circle at 25% 20%,hsl(${h} 85% 62%),transparent 55%),conic-gradient(from ${h}deg,hsl(${h} 70% 30%),hsl(${(h+70)%360} 75% 38%),hsl(${(h+200)%360} 60% 26%),hsl(${h} 70% 30%))"><b>${esc(ini)}</b>${logo?`<img src="${esc(logo)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>`; }
+function setList(tcg){ return S.liveSets[tcg]||REF.setList[tcg]||[]; }
+function cardsInSet(tcg,name){ const b=normSet(name); return cards().filter(c=>{ if(c.tcg!==tcg) return false; const a=normSet(c.set); return a&&(a===b||a.includes(b)||b.includes(a)); }); }
+function ownsCatalog(tcg,setName,cc){ const b=normSet(setName), n=normNum(cc.number), id=normId(cc.id); return cards().some(c=>c.tcg===tcg&&((c.id&&normId(String(c.id).replace(/^rc_/,""))===id)||(c.catalogId&&normId(c.catalogId)===id)||(normSet(c.set)===b&&n&&normNum(c.number)===n))); }
 function vSets(){
-  const tcg=S.setTcg, tabs=REF.tcgs.filter(t=>t.id!=="other");
-  const list=(S.liveSets[tcg]||REF.setList[tcg]||[]), mine=cards().filter(c=>c.tcg===tcg);
-  const known=new Set(list.map(x=>x.name.toLowerCase())), extra=[...new Set(mine.map(c=>(c.set||"").trim()).filter(n=>n&&![...known].some(k=>n.toLowerCase().includes(k)||k.includes(n.toLowerCase()))))].map(n=>({name:n,era:"From your vault",when:""}));
-  const inSet=n=>mine.filter(c=>{ const a=(c.set||"").toLowerCase(), b=n.toLowerCase(); return a&&(a===b||a.includes(b)||b.includes(a)); });
-  if(!S.liveSets[tcg]&&S.net!=="blocked"&&(tcg==="pokemon"||tcg==="yugioh")&&!vSets.busy) loadLiveSets(tcg);
-  return `<h2>Sets</h2><div class="chips" style="margin-bottom:14px">${tabs.map(t=>`<button class="chip ${tcg===t.id?"on":""}" data-act="set-tcg" data-v="${t.id}">${esc(t.label)}</button>`).join("")}</div>
-  <div class="gallery">${[...list,...extra].map(x=>{ const own=inSet(x.name), n=own.reduce((a,c)=>a+(c.qty||1),0), lad=x.ladder&&REF.sets[x.ladder], total=lad?lad.ladder.reduce((a,r)=>a+r.designs,0):x.total, uniq=new Set(own.map(c=>(c.number||c.name||"").toLowerCase())).size;
-    return `<button class="hit" style="--tc:${tcgOf(tcg).accent}" data-act="open-set" data-v="${esc(x.name)}">${emblem(x.name,x.logo)}<span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(x.name)}</b><span class="muted small" style="display:block">${esc([x.era,x.when].filter(Boolean).join(" · "))}</span>${x.facts?`<span class="muted small" style="display:block;margin-top:4px">${esc(x.facts)}</span>`:""}<span class="pills">${n?`<span class="pill acc">${n} in your vault</span>`:`<span class="pill">none yet</span>`}${total&&uniq?`<span class="pill">${uniq} of ${total}</span>`:total?`<span class="pill">${total} cards</span>`:""}${lad?`<span class="pill unv">numbered tiers</span>`:""}</span></span></button>`; }).join("")||`<div class="empty">No set list for this game yet. Sets appear here as you add cards.</div>`}</div>
-  <p class="muted small">${S.liveSets[tcg]?"Set list and logos loaded live from the public card database.":"Tap a set to see your cards from it. Badges here are generated, since set logos only load in the copy of this site hosted outside Claude."}</p>`;
+  if(S.setOpen) return vSetDetail();
+  const tcg=S.setTcg, tabs=REF.tcgs.filter(t=>t.id!=="other"), list=setList(tcg), mine=cards().filter(c=>c.tcg===tcg);
+  const known=list.map(x=>normSet(x.name)), extra=[...new Set(mine.map(c=>(c.set||"").trim()).filter(n=>n&&!known.some(k=>{ const a=normSet(n); return a===k||a.includes(k)||k.includes(a); })))].map(n=>({name:n,era:"From your vault",when:""}));
+  if(!S.liveSets[tcg]&&(tcg==="pokemon"||tcg==="yugioh")) loadLiveSets(tcg);
+  return `<h2>Sets</h2><div class="chips scrollx" style="margin-bottom:14px">${tabs.map(t=>`<button class="chip ${tcg===t.id?"on":""}" data-act="set-tcg" data-v="${t.id}">${esc(t.label)}</button>`).join("")}</div>
+  <div class="gallery">${[...list,...extra].map(x=>{ const own=cardsInSet(tcg,x.name), n=own.reduce((a,c)=>a+(c.qty||1),0), lad=x.ladder&&REF.sets[x.ladder], total=lad?lad.ladder.reduce((a,r)=>a+r.designs,0):x.total;
+    return `<button class="hit" style="--tc:${tcgOf(tcg).accent}" data-act="open-set" data-v="${esc(x.name)}">${emblem(x.name,x.logo)}<span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(x.name)}</b><span class="muted small" style="display:block">${esc([x.era,x.when].filter(Boolean).join(" · "))}</span><span class="pills">${n?`<span class="pill acc">${n} in your vault</span>`:""}${total?`<span class="pill">${total} cards</span>`:""}${lad?`<span class="pill unv">numbered tiers</span>`:""}</span></span></button>`; }).join("")||`<div class="empty">No set list for this game yet. Sets appear here as you add cards.</div>`}</div>
+  ${S.liveSets[tcg]?"":`<p class="muted small" style="margin-top:14px">${S.mode==="cloud"?`Set logos and full card lists with pictures load on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>. Inside Claude you see generated badges and your own cards.`:(tcg==="pokemon"||tcg==="yugioh")?"Loading the live set list.":"There is no public card database for this game, so these badges are generated."}</p>`}`;
+}
+function vSetDetail(){
+  const o=S.setOpen, tcg=o.tcg, tc=tcgOf(tcg), own=cardsInSet(tcg,o.name), key=tcg+":"+(o.id||o.name), data=API.setCards[key], lad=o.ladder&&REF.sets[o.ladder];
+  const list=data&&data.cards||[], meta=data&&data.meta||{}, total=lad?lad.ladder.reduce((a,r)=>a+r.designs,0):(list.length||o.total), have=list.filter(cc=>ownsCatalog(tcg,o.name,cc)).length, shown=list.slice(0,S.setMore||60);
+  const byRar=r=>own.filter(c=>(c.rarity||"").replace(/\s*\(.*$/,"")===r).reduce((a,c)=>a+(c.qty||1),0);
+  return `<p style="margin:0 0 12px"><button class="btn ghost" data-act="set-back">&larr; All ${esc(tc.label)} sets</button></p>
+  <div class="panel sethead" style="--tc:${tc.accent}">${emblem(o.name,o.logo)}<div class="grow"><h2 style="margin:0 0 4px">${esc(o.name)}</h2><div class="muted">${esc([meta.era||o.era,meta.when||o.when,total?total+" cards":""].filter(Boolean).join(" · "))}</div>${o.facts?`<div class="muted small" style="margin-top:4px">${esc(o.facts)}</div>`:""}
+    <div class="pills"><span class="pill acc">${own.reduce((a,c)=>a+(c.qty||1),0)} in your vault</span>${list.length?`<span class="pill">${have} of ${list.length} collected</span>`:""}</div>${list.length?`<progress value="${have}" max="${list.length}" style="margin-top:10px"></progress>`:""}</div></div>
+  ${lad?`<div class="sec">Rarity ladder</div><div class="scroll panel" style="padding:4px 6px"><table><tr><th>Code</th><th>Name</th><th class="n">Designs</th><th class="n">Numbered to</th><th class="n">You have</th></tr>${lad.ladder.map(r=>`<tr><td><b>${esc(r.code)}</b></td><td>${esc(r.name)}<div class="muted small">${esc(r.theme)}</div></td><td class="n">${r.designs}</td><td class="n">${r.run?`<span class="pill acc" style="--tc:var(--accent)">/${r.run}</span>`:`<span class="muted">no</span>`}</td><td class="n">${byRar(r.code)||`<span class="muted">0</span>`}</td></tr>`).join("")}</table></div>`:""}
+  <div class="sec">Your cards from this set</div>${own.length?`<div class="list">${own.sort((a,b)=>(b.raw||0)-(a.raw||0)).map(cardRow).join("")}</div>`:`<div class="empty">None in the vault yet.</div>`}
+  <div class="sec">Full card list${list.length?", chase cards first":""}</div>
+  ${data&&data.loading?`<progress></progress><p class="muted small">Loading the card list.</p>`
+   :list.length?`<div class="gallery">${shown.map((cc,i)=>{ const got=ownsCatalog(tcg,o.name,cc); return `<button class="hit" style="--tc:${tc.accent}" data-act="add-setcard" data-i="${i}"><span class="art">${esc(SHORT[tcg])}${cc.img?`<img src="${esc(cc.img)}" alt="${esc(cc.name)}" loading="lazy" onerror="this.remove()">`:""}${got?`<span class="pill good own">owned</span>`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(cc.name)}</b><span class="muted small" style="display:block">${esc(["#"+cc.number,cc.rarity].filter(Boolean).join(" · "))}</span></span></button>`; }).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="set-more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}<p class="muted small">Tap a card to add it to your vault.</p>`
+   :`<div class="empty">${S.mode==="cloud"&&(tcg==="pokemon"||tcg==="yugioh")?`The full list with card pictures loads on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>.`:data&&data.err?"The card list could not be loaded right now. Try again in a minute.":"There is no public card database with pictures for this set."}</div>`}`;
 }
 async function loadLiveSets(tcg){
-  vSets.busy=true;
+  if(S.liveSets[tcg]||API.busy["s"+tcg]||S.net==="blocked") return; API.busy["s"+tcg]=1;
   try{
-    if(tcg==="pokemon"){ const j=await (await fetch("https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate&pageSize=60")).json(); S.liveSets.pokemon=(j.data||[]).map(x=>({name:x.name,era:x.series,when:(x.releaseDate||"").slice(0,7).replace("/","-"),total:x.printedTotal,logo:x.images&&x.images.logo})); }
-    else { const j=await (await fetch("https://db.ygoprodeck.com/api/v7/cardsets.php")).json(); S.liveSets.yugioh=(j||[]).filter(x=>x.tcg_date).sort((a,b)=>b.tcg_date.localeCompare(a.tcg_date)).slice(0,48).map(x=>({name:x.set_name,era:x.set_code,when:x.tcg_date.slice(0,7),total:x.num_of_cards,logo:x.set_image})); }
-    S.net="open"; if(S.view==="sets") render();
-  }catch(e){ S.net="blocked"; }
-  vSets.busy=false;
+    if(tcg==="pokemon"){ const j=await getJSON(TD+"/sets?sort:field=releaseDate&sort:order=DESC&pagination:itemsPerPage=90"); S.liveSets.pokemon=j.filter(x=>!/^[AB]\d|^P-/.test(x.id)).map(x=>({id:x.id,name:x.name,era:"",when:"",total:x.cardCount&&x.cardCount.total,logo:x.logo?x.logo+".png":""})); API.setNames=Object.fromEntries(j.map(x=>[x.id,x.name])); }
+    else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardsets.php"); S.liveSets.yugioh=(j||[]).filter(x=>x.tcg_date).sort((a,b)=>b.tcg_date.localeCompare(a.tcg_date)).slice(0,60).map(x=>({name:x.set_name,era:x.set_code,when:x.tcg_date.slice(0,7),total:x.num_of_cards,logo:x.set_image||""})); }
+    S.net="open"; if(S.view==="sets"&&!S.setOpen&&!sheetOpen()) render();
+  }catch(e){ if(S.net==="unknown") S.net="blocked"; }
+  API.busy["s"+tcg]=0;
+}
+async function loadSetCards(){
+  const o=S.setOpen; if(!o||S.net==="blocked") return; const key=o.tcg+":"+(o.id||o.name); if(API.setCards[key]) return;
+  if(!((o.tcg==="pokemon"&&o.id)||o.tcg==="yugioh")) return;
+  API.setCards[key]={loading:true}; render();
+  try{ let list=[], meta={};
+    if(o.tcg==="pokemon"){ const j=await getJSON(TD+"/sets/"+encodeURIComponent(o.id)); list=(j.cards||[]).map(c=>({id:c.id,name:c.name,number:c.localId,img:c.image?c.image+"/low.webp":"",big:c.image?c.image+"/high.webp":""})).reverse(); meta={when:j.releaseDate||"",era:j.serie&&j.serie.name||""}; }
+    else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?num=90&offset=0&cardset="+encodeURIComponent(o.name)); list=(j.data||[]).map(c=>{ const cs=(c.card_sets||[]).find(x=>x.set_name===o.name)||{}, im=(c.card_images||[])[0]||{}; return {id:String(c.id),name:c.name,number:cs.set_code||"",rarity:cs.set_rarity||"",price:num(cs.set_price)||null,img:im.image_url_small||"",big:im.image_url||""}; }); }
+    API.setCards[key]={cards:list,meta}; S.net="open";
+  }catch(e){ API.setCards[key]={cards:[],err:true}; setTimeout(()=>{ delete API.setCards[key]; },20000); }
+  if(S.view==="sets"&&!sheetOpen()) render();
+}
+async function pokeDetail(id){ try{ const d=await getJSON(TD+"/cards/"+encodeURIComponent(id)); let price=null; const tp=d.pricing&&d.pricing.tcgplayer; if(tp) for(const k of Object.keys(tp)){ const v=tp[k]; if(v&&typeof v==="object"&&v.marketPrice!=null){ price=Math.max(price||0,v.marketPrice); } } return {rarity:d.rarity||"",price,setName:d.set&&d.set.name||""}; }catch(e){ return {}; } }
+async function addCatalogCard(tcg,setName,cc){
+  toast("Getting card details."); let extra={}; if(tcg==="pokemon") extra=await pokeDetail(cc.id);
+  const raw=extra.price!=null?extra.price:(cc.price!=null?cc.price:null);
+  cardSheet({tcg,name:cc.name,set:setName||extra.setName||"",number:cc.number||"",rarity:extra.rarity||cc.rarity||"",imageUrl:cc.big||cc.img||"",catalogId:cc.id,raw,rawStatus:raw!=null?"estimate":"unverified",serial:"no",source:"catalog"},true);
 }
 
 /* ---------- serial checklist ---------- */
@@ -514,13 +614,13 @@ function drawCardSheet(){
      <label class="f">Rarity<input type="text" id="cRarity" list="rarList" value="${esc(c.rarity)}"><datalist id="rarList">${(REF.rarities[c.tcg]||[]).map(r=>`<option value="${esc(r)}">`).join("")}</datalist></label></div>
    <div class="grid3"><label class="f">Pulled from<select id="cProduct"><option value="">Not from a tracked product</option>${ps.map(p=>`<option value="${p.id}" ${c.productId===p.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>
      <label class="f">Pack number<input type="number" inputmode="numeric" id="cPack" value="${c.pack??""}"></label><label class="f">Quantity<input type="number" inputmode="numeric" id="cQty" value="${c.qty||1}"></label></div>
-   <div class="panel stack" style="background:#10141c"><b>Serial number</b>${seg("serial",[["unverified","Unverified"],["yes","Numbered"],["no","Not numbered"]],c.serial)}
+   <div class="inset"><b>Serial number</b>${seg("serial",[["unverified","Unverified"],["yes","Numbered"],["no","Not numbered"]],c.serial)}
      ${c.serial==="yes"?`<div class="grid2"><label class="f">Your copy<input type="text" id="cSerialNo" value="${esc(c.serialNo)}" placeholder="e.g. 042"></label><label class="f">Out of<input type="text" id="cSerialRun" value="${esc(c.serialRun)}" placeholder="e.g. 220"></label></div>`:c.serial==="unverified"?`<span class="muted small">Stays flagged until you check it. The Serial check tab walks you through it.</span>`:""}</div>
-   <div class="panel stack" style="background:#10141c"><b>Value</b>
+   <div class="inset"><b>Value</b>
      <div class="grid2"><label class="f">Raw value<input type="number" inputmode="decimal" step="0.01" id="cRaw" value="${c.raw??""}" placeholder="Leave blank if unknown"></label><div class="f">How sure${stat("rawStatus")}</div></div>
      <div class="grid2"><label class="f">Beckett 10 estimate<input type="number" inputmode="decimal" step="0.01" id="cBgs" value="${c.bgs??""}" placeholder="Leave blank if unknown"></label><div class="f">How sure${stat("bgsStatus")}</div></div>
      <span class="muted small">Verified means you saw a sold listing. Estimate means an app or asking price. Unverified means a guess.</span></div>
-   <div class="panel stack" style="background:#10141c"><b>Decision</b>${seg("decision",[["undecided","Undecided"],["keep","Keep"],["trade","Trade"],["sell","Sell"]],c.decision)}
+   <div class="inset"><b>Decision</b>${seg("decision",[["undecided","Undecided"],["keep","Keep"],["trade","Trade"],["sell","Sell"]],c.decision)}
      ${c.decision==="keep"?`<span class="muted small">Why keep it? Loving the card is reason enough.</span><div class="chips">${REASONS.map(r=>`<button type="button" class="chip ${c.reasons.includes(r)?"on":""}" data-act="reason" data-v="${esc(r)}">${esc(r)}</button>`).join("")}</div>`:""}</div>
    <div class="row"><label class="check"><input type="checkbox" id="cTop" ${c.toploaded?"checked":""}>Top loaded</label><label class="check"><input type="checkbox" id="cHit" ${c.isHit?"checked":""}>Show in hit gallery</label></div>
    <label class="f">Notes<textarea id="cNotes" placeholder="Condition, centering, where the stamp is, why it matters to you">${esc(c.notes)}</textarea></label>
@@ -611,10 +711,10 @@ async function doSearch(){
   let out=null;
   if(S.net!=="blocked" && (s.tcg==="pokemon"||s.tcg==="yugioh")){
     try{
-      if(s.tcg==="pokemon"){ const r=await fetch("https://api.pokemontcg.io/v2/cards?pageSize=30&orderBy=-set.releaseDate&q="+encodeURIComponent('name:"'+q.replace(/"/g,"")+'*"')); const j=await r.json();
-        out=(j.data||[]).map(c=>{ const pr=c.tcgplayer&&c.tcgplayer.prices?Object.values(c.tcgplayer.prices).map(p=>p.market).filter(Boolean):[]; return {tcg:"pokemon",name:c.name,set:c.set&&c.set.name,number:c.number+(c.set&&c.set.printedTotal?"/"+c.set.printedTotal:""),rarity:c.rarity||"",imageUrl:c.images&&c.images.small,raw:pr.length?Math.max(...pr):null}; }); }
+      if(s.tcg==="pokemon"){ if(!API.setNames) await loadLiveSets("pokemon"); const j=await getJSON(TD+"/cards?name="+encodeURIComponent(q)+"&sort:field=set.releaseDate&sort:order=DESC&pagination:itemsPerPage=40");
+        out=j.filter(c=>!/^[AB]\d|^P-/.test(c.id)).map(c=>{ const sid=c.id.slice(0,c.id.lastIndexOf("-")); return {tcg:"pokemon",name:c.name,set:(API.setNames&&API.setNames[sid])||"",number:c.localId,rarity:"",img:c.image?c.image+"/low.webp":"",imageUrl:c.image?c.image+"/high.webp":"",raw:null,tdId:c.id}; }); }
       else { const r=await fetch("https://db.ygoprodeck.com/api/v7/cardinfo.php?num=30&offset=0&fname="+encodeURIComponent(q)); const j=await r.json();
-        out=(j.data||[]).map(c=>{ const cs=(c.card_sets||[])[0]||{}, p=(c.card_prices||[])[0]||{}; return {tcg:"yugioh",name:c.name,set:cs.set_name||"",number:cs.set_code||"",rarity:cs.set_rarity||"",imageUrl:(c.card_images||[])[0]&&c.card_images[0].image_url_small,raw:num(p.tcgplayer_price)||null}; }); }
+        out=(j.data||[]).map(c=>{ const cs=(c.card_sets||[])[0]||{}, p=(c.card_prices||[])[0]||{}; return {tcg:"yugioh",name:c.name,set:cs.set_name||"",number:cs.set_code||"",rarity:cs.set_rarity||"",img:(c.card_images||[])[0]&&c.card_images[0].image_url_small,imageUrl:(c.card_images||[])[0]&&c.card_images[0].image_url,raw:num(p.tcgplayer_price)||null}; }); }
       S.net="open";
     }catch(e){ S.net="blocked"; out=null; }
   }
@@ -690,9 +790,13 @@ document.addEventListener("click", async e=>{
   else if(a==="sheet-read") sheetRead();
   else if(a==="sheet-add") sheetAdd();
   else if(a==="sheet-clear"){ S.sheet=null; render(); }
-  else if(a==="set-tcg"){ S.setTcg=v; render(); }
-  else if(a==="open-set"){ S.f.tcg=S.setTcg; S.f.q=v; S.f.owner="all"; S.f.decision="all"; S.more=60; location.hash="collection"; }
+  else if(a==="set-tcg"){ S.setTcg=v; S.setOpen=null; render(); }
+  else if(a==="open-set"){ const x=[...setList(S.setTcg)].find(z=>z.name===v)||{name:v}; S.setOpen={tcg:S.setTcg,...x}; S.setMore=60; render(); window.scrollTo(0,0); loadSetCards(); }
+  else if(a==="set-back"){ S.setOpen=null; render(); }
+  else if(a==="set-more"){ S.setMore=(S.setMore||60)+60; render(); }
+  else if(a==="add-setcard"){ const o=S.setOpen, d=o&&API.setCards[o.tcg+":"+(o.id||o.name)], cc=d&&d.cards&&d.cards[+b.dataset.i]; if(cc) addCatalogCard(o.tcg,o.name,cc); }
   else if(a==="do-search") doSearch();
+  else if(a==="add-result"&&S.search.results[+b.dataset.i]&&S.search.results[+b.dataset.i].tdId){ const r=S.search.results[+b.dataset.i]; addCatalogCard("pokemon",r.set,{id:r.tdId,name:r.name,number:r.number,big:r.imageUrl,img:r.img}); }
   else if(a==="add-result"){ const r=S.search.results[+b.dataset.i]; if(r) cardSheet({tcg:r.tcg,name:r.name,set:r.set,number:r.number,rarity:r.rarity,imageUrl:r.imageUrl||"",raw:r.raw,rawStatus:r.raw!=null?"estimate":"unverified",serial:r.tcg==="naruto"||r.tcg==="kpdh"?"unverified":"no",source:"search"},true); }
   else if(a==="imp-preview") impPreview();
   else if(a==="imp-go") impGo();
@@ -713,6 +817,7 @@ document.addEventListener("change", e=>{ const t=e.target;
   else if(t.id==="gradeFee"){ S.settings.gradeFee=num(t.value); saveSettings(); if(S.mode==="cloud") render(); }
   else if(t.id==="camIn"||t.id==="libIn") handleScan(t.files[0]);
   else if(t.id==="sheetIn") sheetPick(t.files[0]);
+  else if(t.id==="bakFile") restoreBackup(t.files[0]);
   else if(t.id==="sheetLay"){ const [c,r]=t.value.split("x").map(Number); Object.assign(S.sheet,{lay:t.value,cols:c,rows:r,cells:null}); render(); }
   else if(t.id==="sheetTcg"){ S.sheet.tcg=t.value; }
   else if(t.id==="sheetOwner"){ S.sheet.owner=t.value; }

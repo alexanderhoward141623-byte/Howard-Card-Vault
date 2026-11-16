@@ -9,7 +9,7 @@ Phone-friendly collection tracker for the family's trading cards: Naruto Kayou, 
 - **Raw vs BGS 10**: side by side value comparison with a grading fee.
 - **Search + Scan**: search the vault and the card catalog, scan one card, scan a whole binder page, import a CSV.
 - **What's hot**: MSRP versus live listings, best hit rates, and a personal price watch.
-- **Sets**: set lists per game.
+- **Sets**: set lists per game. Each set opens its own page with its card list.
 - **Serial check**: step by step checklist for numbered cards, with the Chapter Jin Series 3 rarity ladder.
 
 ## Files
