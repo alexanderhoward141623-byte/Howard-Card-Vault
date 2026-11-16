@@ -252,6 +252,7 @@ function drawFoil(){
 const TD="https://api.tcgdex.net/v2/en";
 const API={chase:{},pick:{},setCards:{},busy:{},setNames:null};
 async function getJSON(u){ const c=new AbortController(), t=setTimeout(()=>c.abort(),12000); try{ const r=await fetch(u,{signal:c.signal}); if(!r.ok) throw new Error("http "+r.status); return await r.json(); } finally{ clearTimeout(t); } }
+let netFails=0; function netOk(){ netFails=0; S.net="open"; } function netFail(){ netFails++; if(netFails>=3&&S.net!=="open") S.net="blocked"; return S.net!=="blocked"; }
 const normId=v=>String(v||"").toLowerCase().replace(/pt/g,".").replace(/(^|[^0-9.])0+(\d)/g,"$1$2");
 const normNum=v=>String(v||"").split("/")[0].trim().toLowerCase().replace(/^0+(?=.)/,"");
 const normSet=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
@@ -261,9 +262,9 @@ async function loadChase(tcg){
   try{ let list=[];
     if(tcg==="pokemon"){ const j=await getJSON(TD+"/cards?rarity=Special%20illustration%20rare&sort:field=set.releaseDate&sort:order=DESC&pagination:itemsPerPage=30"); list=j.filter(c=>c.image).map(c=>({src:c.image+"/high.webp",name:c.name})); }
     else if(tcg==="yugioh"){ const names=["Blue-Eyes White Dragon","Dark Magician","Black Luster Soldier","Red-Eyes Black Dragon","Exodia the Forbidden One","Dark Magician Girl","Slifer the Sky Dragon"]; const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?name="+encodeURIComponent(names.join("|"))); list=(j.data||[]).map(c=>({src:c.card_images[0].image_url,name:c.name})); }
-    API.chase[tcg]=list; if(list.length) S.net="open";
-  }catch(e){ API.chase[tcg]=[]; if(S.net==="unknown") S.net="blocked"; }
-  API.busy["c"+tcg]=0; drawChase();
+    API.chase[tcg]=list; netOk();
+  }catch(e){ if(netFail()) setTimeout(drawChase,1500); else API.chase[tcg]=[]; }
+  API.busy["c"+tcg]=0; if(API.chase[tcg]) drawChase();
 }
 function drawChase(){
   const el=$("#chase"), tcg=focusTcg(), list=API.chase[tcg];
@@ -555,8 +556,8 @@ async function loadLiveSets(tcg){
   try{
     if(tcg==="pokemon"){ const j=await getJSON(TD+"/sets?sort:field=releaseDate&sort:order=DESC&pagination:itemsPerPage=90"); S.liveSets.pokemon=j.filter(x=>!/^[AB]\d|^P-/.test(x.id)).map(x=>({id:x.id,name:x.name,era:"",when:"",total:x.cardCount&&x.cardCount.total,logo:x.logo?x.logo+".png":""})); API.setNames=Object.fromEntries(j.map(x=>[x.id,x.name])); }
     else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardsets.php"); S.liveSets.yugioh=(j||[]).filter(x=>x.tcg_date).sort((a,b)=>b.tcg_date.localeCompare(a.tcg_date)).slice(0,60).map(x=>({name:x.set_name,era:x.set_code,when:x.tcg_date.slice(0,7),total:x.num_of_cards,logo:x.set_image||""})); }
-    S.net="open"; if(S.view==="sets"&&!S.setOpen&&!sheetOpen()) render();
-  }catch(e){ if(S.net==="unknown") S.net="blocked"; }
+    netOk(); if(S.view==="sets"&&!S.setOpen&&!sheetOpen()) render();
+  }catch(e){ if(netFail()) setTimeout(()=>{ if(S.view==="sets") loadLiveSets(tcg); },1500); }
   API.busy["s"+tcg]=0;
 }
 async function loadSetCards(){
@@ -566,7 +567,7 @@ async function loadSetCards(){
   try{ let list=[], meta={};
     if(o.tcg==="pokemon"){ const j=await getJSON(TD+"/sets/"+encodeURIComponent(o.id)); list=(j.cards||[]).map(c=>({id:c.id,name:c.name,number:c.localId,img:c.image?c.image+"/low.webp":"",big:c.image?c.image+"/high.webp":""})).reverse(); meta={when:j.releaseDate||"",era:j.serie&&j.serie.name||""}; }
     else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?num=90&offset=0&cardset="+encodeURIComponent(o.name)); list=(j.data||[]).map(c=>{ const cs=(c.card_sets||[]).find(x=>x.set_name===o.name)||{}, im=(c.card_images||[])[0]||{}; return {id:String(c.id),name:c.name,number:cs.set_code||"",rarity:cs.set_rarity||"",price:num(cs.set_price)||null,img:im.image_url_small||"",big:im.image_url||""}; }); }
-    API.setCards[key]={cards:list,meta}; S.net="open";
+    API.setCards[key]={cards:list,meta}; netOk();
   }catch(e){ API.setCards[key]={cards:[],err:true}; setTimeout(()=>{ delete API.setCards[key]; },20000); }
   if(S.view==="sets"&&!sheetOpen()) render();
 }
@@ -715,8 +716,8 @@ async function doSearch(){
         out=j.filter(c=>!/^[AB]\d|^P-/.test(c.id)).map(c=>{ const sid=c.id.slice(0,c.id.lastIndexOf("-")); return {tcg:"pokemon",name:c.name,set:(API.setNames&&API.setNames[sid])||"",number:c.localId,rarity:"",img:c.image?c.image+"/low.webp":"",imageUrl:c.image?c.image+"/high.webp":"",raw:null,tdId:c.id}; }); }
       else { const r=await fetch("https://db.ygoprodeck.com/api/v7/cardinfo.php?num=30&offset=0&fname="+encodeURIComponent(q)); const j=await r.json();
         out=(j.data||[]).map(c=>{ const cs=(c.card_sets||[])[0]||{}, p=(c.card_prices||[])[0]||{}; return {tcg:"yugioh",name:c.name,set:cs.set_name||"",number:cs.set_code||"",rarity:cs.set_rarity||"",img:(c.card_images||[])[0]&&c.card_images[0].image_url_small,imageUrl:(c.card_images||[])[0]&&c.card_images[0].image_url,raw:num(p.tcgplayer_price)||null}; }); }
-      S.net="open";
-    }catch(e){ S.net="blocked"; out=null; }
+      netOk();
+    }catch(e){ netFail(); out=null; }
   }
   if(out===null){
     if(sample){
