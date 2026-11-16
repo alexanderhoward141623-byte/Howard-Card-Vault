@@ -252,7 +252,8 @@ function drawFoil(){
 const TD="https://api.tcgdex.net/v2/en";
 const API={chase:{},pick:{},setCards:{},busy:{},setNames:null};
 async function getJSON(u){ const c=new AbortController(), t=setTimeout(()=>c.abort(),12000); try{ const r=await fetch(u,{signal:c.signal}); if(!r.ok) throw new Error("http "+r.status); return await r.json(); } finally{ clearTimeout(t); } }
-let netFails=0; function netOk(){ netFails=0; S.net="open"; } function netFail(){ netFails++; if(netFails>=3&&S.net!=="open") S.net="blocked"; return S.net!=="blocked"; }
+let netFails=0; function netOk(){ netFails=0; S.net="open"; } function netFail(){ netFails++; if(netFails>=6&&S.net!=="open") S.net="blocked"; return S.net!=="blocked"; }
+const retryIn=()=>Math.min(8000,1200*Math.max(1,netFails));
 const normId=v=>String(v||"").toLowerCase().replace(/pt/g,".").replace(/(^|[^0-9.])0+(\d)/g,"$1$2");
 const normNum=v=>String(v||"").split("/")[0].trim().toLowerCase().replace(/^0+(?=.)/,"");
 const normSet=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
@@ -263,7 +264,7 @@ async function loadChase(tcg){
     if(tcg==="pokemon"){ const j=await getJSON(TD+"/cards?rarity=Special%20illustration%20rare&sort:field=set.releaseDate&sort:order=DESC&pagination:itemsPerPage=30"); list=j.filter(c=>c.image).map(c=>({src:c.image+"/high.webp",name:c.name})); }
     else if(tcg==="yugioh"){ const names=["Blue-Eyes White Dragon","Dark Magician","Black Luster Soldier","Red-Eyes Black Dragon","Exodia the Forbidden One","Dark Magician Girl","Slifer the Sky Dragon"]; const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?name="+encodeURIComponent(names.join("|"))); list=(j.data||[]).map(c=>({src:c.card_images[0].image_url,name:c.name})); }
     API.chase[tcg]=list; netOk();
-  }catch(e){ if(netFail()) setTimeout(drawChase,1500); else API.chase[tcg]=[]; }
+  }catch(e){ if(netFail()) setTimeout(drawChase,retryIn()); else API.chase[tcg]=[]; }
   API.busy["c"+tcg]=0; if(API.chase[tcg]) drawChase();
 }
 function drawChase(){
@@ -557,7 +558,7 @@ async function loadLiveSets(tcg){
     if(tcg==="pokemon"){ const j=await getJSON(TD+"/sets?sort:field=releaseDate&sort:order=DESC&pagination:itemsPerPage=90"); S.liveSets.pokemon=j.filter(x=>!/^[AB]\d|^P-/.test(x.id)).map(x=>({id:x.id,name:x.name,era:"",when:"",total:x.cardCount&&x.cardCount.total,logo:x.logo?x.logo+".png":""})); API.setNames=Object.fromEntries(j.map(x=>[x.id,x.name])); }
     else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardsets.php"); S.liveSets.yugioh=(j||[]).filter(x=>x.tcg_date).sort((a,b)=>b.tcg_date.localeCompare(a.tcg_date)).slice(0,60).map(x=>({name:x.set_name,era:x.set_code,when:x.tcg_date.slice(0,7),total:x.num_of_cards,logo:x.set_image||""})); }
     netOk(); if(S.view==="sets"&&!S.setOpen&&!sheetOpen()) render();
-  }catch(e){ if(netFail()) setTimeout(()=>{ if(S.view==="sets") loadLiveSets(tcg); },1500); }
+  }catch(e){ if(netFail()) setTimeout(()=>{ if(S.view==="sets") loadLiveSets(tcg); },retryIn()); }
   API.busy["s"+tcg]=0;
 }
 async function loadSetCards(){
