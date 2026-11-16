@@ -137,6 +137,7 @@ progress{width:100%;accent-color:var(--accent)}
 <div id="sheet"><div class="box" id="sheetBox"></div></div>
 <div id="toast" role="status"></div>
 <script src="data/reference.js"></script>
+<script src="data/rarecandy.js"></script>
 <script>
 "use strict";
 const REF = window.TCG_REF || {tcgs:[{id:"other",label:"Other",accent:"#8fd3c8"}],rarities:{},sets:{},serialSteps:[],otherSerialNotes:[],gradingNotes:[],hot:{hitRates:[],market:[],radar:[]},setList:{}};
@@ -261,6 +262,7 @@ function vCollection(){
   </div>
   <div class="row" style="margin:14px 0 10px"><input type="search" id="q" placeholder="Filter this list by name, set, number" value="${esc(S.f.q)}" class="grow">
     <select id="fDecision" style="width:auto"><option value="all">Any decision</option>${["undecided","keep","trade","sell"].map(d=>`<option ${S.f.decision===d?"selected":""}>${d}</option>`).join("")}</select></div>
+  ${RC&&S.mode!=="starting"&&!S.readOnly&&(RCS.busy||RCS.msg||rcPending().length===RC.rows.length)?`<div class="panel stack" style="margin-bottom:12px;border-color:var(--accent)"><b>Your Rare Candy library is ready</b><span class="muted">${RC.rows.length} Pokémon cards read from the Pilot007 profile on ${esc(RC.asOf)}.</span>${rcButton()}</div>`:""}
   ${list.length? `<div class="stack">${shown.map(cardRow).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}`
     : `<div class="empty">${cards().length? "Nothing matches these filters." : S.mode==="starting" ? "Opening the vault." : "No cards yet. Tap Add card, scan one, or log a pull from the Rip log."}</div>`}
   <div class="row" style="margin-top:18px"><button class="btn" data-act="export-json">Export backup</button><button class="btn" data-act="export-csv">Export CSV</button></div>`;
@@ -402,7 +404,7 @@ async function sheetAdd(){
 }
 function findImport(){
   const im=S.imp;
-  return `<div class="panel stack"><b>Rare Candy library</b><span class="muted">Rare Candy has no export button, so Claude reads your public profile (Pilot007) and loads it here. To refresh after you scan more cards there, ask Claude in chat to "refresh my Rare Candy import".</span><span class="pills"><span class="pill">${cards().filter(c=>c.source==="rarecandy").length} cards from Rare Candy in the vault</span></span></div>
+  return `<div class="panel stack"><b>Rare Candy library</b><span class="muted">Rare Candy has no export button, so Claude reads your public profile (Pilot007) and loads it here. To refresh after you scan more cards there, ask Claude in chat to "refresh my Rare Candy import".</span><span class="pills"><span class="pill">${cards().filter(c=>c.source==="rarecandy").length} cards from Rare Candy in the vault</span>${RC?`<span class="pill">${RC.rows.length} cards read from your profile on ${esc(RC.asOf)}</span>`:""}</span>${rcButton()}</div>
   <div class="panel stack" style="margin-top:12px"><b>Import a CSV or pasted list</b><span class="muted">Works with exports from most collection apps. Columns it understands: name, set, number, quantity, condition, rarity, price.</span>
     <div class="grid2"><label class="f">Game<select id="impTcg">${REF.tcgs.map(t=>`<option value="${t.id}" ${t.id==="pokemon"?"selected":""}>${esc(t.label)}</option>`).join("")}</select></label><label class="f">Collector<select id="impOwner">${S.settings.owners.map(o=>`<option>${esc(o)}</option>`).join("")}</select></label></div>
     <input type="file" id="impFile" accept=".csv,.tsv,.txt,text/csv,text/plain">
@@ -410,6 +412,26 @@ function findImport(){
     <div class="row"><button class="btn" data-act="imp-preview">Preview</button>${im.rows?`<button class="btn pri" data-act="imp-go" ${im.busy?"disabled":""}>Import ${im.rows.length} cards</button>`:""}</div>
     ${im.msg?`<div class="note">${esc(im.msg)}</div>`:""}${im.busy?`<progress value="${im.done}" max="${im.total}"></progress>`:""}
     ${im.rows&&!im.busy?`<div class="scroll"><table><tr><th>Name</th><th>Set</th><th>No.</th><th class="n">Qty</th><th class="n">Price</th></tr>${im.rows.slice(0,6).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.set)}</td><td>${esc(r.number)}</td><td class="n">${r.qty}</td><td class="n">${money(r.raw)}</td></tr>`).join("")}</table></div><span class="muted small">Showing the first ${Math.min(6,im.rows.length)}. Imported prices are saved as estimates.</span>`:""}</div>`;
+}
+
+const RC = window.RC_LIBRARY && Array.isArray(window.RC_LIBRARY.rows) ? window.RC_LIBRARY : null;
+const RCS = {busy:false,done:0,msg:""};
+const RCRAR = {C:"Common",R:"Rare",D:"Double Rare",I:"Illustration Rare",P:"Promo"};
+function rcPending(){ return RC ? RC.rows.filter(r=>{ const c=S.cards.get("rc_"+r[5]); return !c || c.qty!==r[4] || (r[1]!=null&&c.rawStatus==="estimate"&&c.raw!==r[1]); }) : []; }
+function rcButton(){ if(!RC||S.readOnly) return ""; const n=rcPending().length;
+  return `${RCS.busy?`<progress value="${RCS.done}" max="${RCS.total}"></progress><span class="muted small">Loading ${RCS.done} of ${RCS.total}. Keep this page open.</span>`: n?`<div class="row"><button class="btn pri" data-act="rc-load">${n===RC.rows.length?`Load all ${n} cards into the vault`:`Update ${n} cards from Rare Candy`}</button></div>`:`<span class="muted small">Everything from that reading is already in the vault.</span>`}${RCS.msg?`<div class="note">${esc(RCS.msg)}</div>`:""}`; }
+async function rcLoad(){
+  if(RCS.busy) return; const todo=rcPending(); RCS.busy=true; RCS.done=0; RCS.total=todo.length; RCS.msg=""; render(); let fail=0; const owner=S.settings.owners[0];
+  for(const r of todo){
+    const [name,price,set,numRaw,qty,sid]=r, id="rc_"+sid, old=S.cards.get(id), m=String(numRaw).match(/^(.*?)(?:\s+([A-Z]))?$/), ja=/_ja/.test(sid);
+    const card = old ? {...old,qty,raw:(old.rawStatus==="estimate"||old.raw==null)?price:old.raw,rawStatus:old.raw==null&&price!=null?"estimate":old.rawStatus}
+      : {id,createdAt:Date.now(),tcg:"pokemon",owner,name,set,number:m?m[1]:numRaw,rarity:m&&m[2]?(RCRAR[m[2]]||m[2]):"",qty,raw:price,rawStatus:price!=null?"estimate":"unverified",bgsStatus:"unverified",serial:"no",decision:"undecided",reasons:[],isHit:price!=null&&price>=20,source:"rarecandy",imageUrl:"https://images.scrydex.com/pokemon/"+sid+"/large",notes:(ja?"Japanese card. ":"")+"Price is the Rare Candy estimate."};
+    if(S.mode==="local"){ S.cards.set(id,card); }
+    else { const {id:_,...data}=card; data.updatedAt=Date.now(); let ok=false; for(let t=0;t<4&&!ok;t++){ try{ await db.doc("cards/"+id).set(data); ok=true; }catch(e){ if(e&&e.code==="resource_exhausted") await new Promise(z=>setTimeout(z,3000)); else if(e&&e.code==="unavailable") await new Promise(z=>setTimeout(z,1200)); else { t=9; } } } if(!ok) fail++; }
+    RCS.done++; if(RCS.done%8===0){ const p=document.querySelector("progress"); if(p) p.value=RCS.done; }
+  }
+  if(S.mode==="local") saveLocal();
+  RCS.busy=false; RCS.msg = fail ? `${RCS.total-fail} cards loaded. ${fail} did not save, tap the button again to finish.` : `${RCS.total} cards loaded from Rare Candy.`; render();
 }
 
 /* ---------- hot ---------- */
@@ -663,6 +685,7 @@ document.addEventListener("click", async e=>{
   else if(a==="pull"){ const p=S.products.get(id); if(p) cardSheet({tcg:p.tcg,set:p.set,productId:p.id,pack:Math.max(1,p.packsOpened||1),source:"pull"},true); }
   else if(a==="seed-naruto") seedNaruto();
   else if(a==="find-tab"){ S.findTab=v; render(); }
+  else if(a==="rc-load") rcLoad();
   else if(a==="sheet-read") sheetRead();
   else if(a==="sheet-add") sheetAdd();
   else if(a==="sheet-clear"){ S.sheet=null; render(); }
