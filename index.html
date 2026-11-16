@@ -28,12 +28,12 @@ a{color:var(--accent)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #backdrop{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 #foil{width:100%;height:100%;display:block;opacity:.4}
-#chase{position:absolute;top:-36px;left:50%;transform:translateX(-50%);display:flex;justify-content:center;align-items:flex-start;width:max-content}
-#chase img{width:clamp(150px,34vw,250px);aspect-ratio:63/88;object-fit:cover;border-radius:14px;margin:0 clamp(-46px,-7vw,-28px);box-shadow:0 18px 50px #000d;opacity:0;transition:opacity .6s}
+#chase{position:absolute;inset:-14% -22%;display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(118px,25vw,190px),1fr));gap:14px;align-content:start;transform:rotate(-8deg)}
+#chase img{width:100%;aspect-ratio:63/88;object-fit:cover;border-radius:10px;opacity:0;transition:opacity .7s;box-shadow:0 8px 24px #000a}
 #chase img.in{opacity:.78}
-#backdrop::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#0a0d131a 0,#0a0d1373 200px,#0a0d13d1 360px,var(--ink) 540px)}
+#backdrop::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#0a0d1366 0,#0a0d13b0 300px,#0a0d13c4 100%)}
 .app{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 16px calc(var(--nav) + 96px)}
-header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:64px 0 14px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 0 12px}
 .brand h1{font:800 clamp(21px,6vw,27px)/1 var(--display);white-space:nowrap;margin:0;letter-spacing:-.02em;text-shadow:0 2px 18px #000a}
 .brand h1 span{color:var(--accent)}
 .brand p{margin:5px 0 0;color:var(--muted);font-size:12.5px;text-shadow:0 1px 8px #000}
@@ -48,7 +48,8 @@ nav.bottomnav a.on{color:var(--accent)}
 .subnav{display:flex;gap:4px;background:#131822d9;border:1px solid var(--line);border-radius:12px;padding:4px;margin:0 0 14px;backdrop-filter:blur(8px)}
 .subnav a{flex:1;text-align:center;text-decoration:none;color:var(--muted);font-weight:600;font-size:13.5px;padding:8px 6px;border-radius:9px;white-space:nowrap}
 .subnav a.on{background:var(--panel2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)}
-h2{font:800 22px/1.15 var(--display);margin:22px 0 12px;text-wrap:balance;letter-spacing:-.01em}
+h2{font:800 22px/1.15 var(--display);margin:22px 0 12px;text-wrap:balance;letter-spacing:-.01em;text-shadow:0 2px 12px #000c}
+.app>main>p,.app>main>.muted,.sec{text-shadow:0 1px 8px #000}
 h3{font:700 15px/1.25 var(--body);margin:0}
 .sec{font:700 12px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px}
 .muted{color:var(--muted)} .small{font-size:12.5px}
@@ -93,7 +94,7 @@ h3{font:700 15px/1.25 var(--body);margin:0}
 .hit .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .hit .cap{padding:10px 11px 12px}
 .hit .own{position:absolute;top:8px;right:8px;z-index:2}
-.empty{border:1px dashed var(--line);border-radius:var(--r);padding:24px 18px;text-align:center;color:var(--muted);background:#13182280}
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:24px 18px;text-align:center;color:var(--muted);background:#131822e6}
 .bars{display:grid;gap:5px;margin-top:8px}
 .bar{display:grid;grid-template-columns:62px 1fr 78px;gap:8px;align-items:center;font-size:12.5px;font-variant-numeric:tabular-nums}
 .bar i{display:block;height:11px;border-radius:999px;background:var(--muted);min-width:2px}
@@ -141,7 +142,7 @@ textarea{min-height:70px;resize:vertical}
 .gridlines span{border:1px dashed #fffc;display:grid;place-items:start;padding:3px 5px;font:700 12px var(--body);color:#fff;text-shadow:0 1px 3px #000}
 .preview{width:120px;aspect-ratio:63/88;object-fit:cover;border-radius:9px;border:1px solid var(--line)}
 progress{width:100%;accent-color:var(--accent);height:8px}
-.note{border-left:3px solid var(--unv);padding:9px 12px;background:#b9a2f214;border-radius:0 12px 12px 0;font-size:13.5px}
+.note{border-left:3px solid var(--unv);padding:9px 12px;background:#1d1a2df2;border-radius:0 12px 12px 0;font-size:13.5px}
 @media(min-width:900px){
   :root{--nav:0px}
   .app{padding-bottom:80px}
@@ -257,23 +258,27 @@ const retryIn=()=>Math.min(8000,1200*Math.max(1,netFails));
 const normId=v=>String(v||"").toLowerCase().replace(/pt/g,".").replace(/(^|[^0-9.])0+(\d)/g,"$1$2");
 const normNum=v=>String(v||"").split("/")[0].trim().toLowerCase().replace(/^0+(?=.)/,"");
 const normSet=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
-function focusTcg(){ const t = S.view==="sets" ? S.setTcg : S.view==="find" ? S.search.tcg : S.f.tcg; return t==="all" ? "pokemon" : t; }
+function focusTcg(){ return S.view==="sets" ? S.setTcg : S.view==="find" ? S.search.tcg : S.f.tcg; }
 async function loadChase(tcg){
   if(API.chase[tcg]||API.busy["c"+tcg]||S.net==="blocked") return; API.busy["c"+tcg]=1;
   try{ let list=[];
-    if(tcg==="pokemon"){ const j=await getJSON(TD+"/cards?rarity=Special%20illustration%20rare&sort:field=set.releaseDate&sort:order=DESC&pagination:itemsPerPage=30"); list=j.filter(c=>c.image).map(c=>({src:c.image+"/high.webp",name:c.name})); }
-    else if(tcg==="yugioh"){ const names=["Blue-Eyes White Dragon","Dark Magician","Black Luster Soldier","Red-Eyes Black Dragon","Exodia the Forbidden One","Dark Magician Girl","Slifer the Sky Dragon"]; const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?name="+encodeURIComponent(names.join("|"))); list=(j.data||[]).map(c=>({src:c.card_images[0].image_url,name:c.name})); }
+    if(tcg==="pokemon"){ const j=await getJSON(TD+"/cards?rarity=Special%20illustration%20rare&sort:field=set.releaseDate&sort:order=DESC&pagination:itemsPerPage=40"); list=j.filter(c=>c.image).map(c=>({src:c.image+"/low.webp",name:c.name})); }
+    else if(tcg==="yugioh"){ const names=["Blue-Eyes White Dragon","Dark Magician","Black Luster Soldier","Red-Eyes Black Dragon","Exodia the Forbidden One","Dark Magician Girl","Slifer the Sky Dragon","Obelisk the Tormentor","The Winged Dragon of Ra","Blue-Eyes Ultimate Dragon","Stardust Dragon","Cyber Dragon"]; const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?name="+encodeURIComponent(names.join("|"))); list=(j.data||[]).map(c=>({src:c.card_images[0].image_url_small,name:c.name})); }
     API.chase[tcg]=list; netOk();
   }catch(e){ if(netFail()) setTimeout(drawChase,retryIn()); else API.chase[tcg]=[]; }
   API.busy["c"+tcg]=0; if(API.chase[tcg]) drawChase();
 }
+function chaseList(t){
+  if(t==="pokemon"||t==="yugioh"){ if(!API.chase[t]) loadChase(t); return API.chase[t]||[]; }
+  const c=REF.chase&&REF.chase[t]; return c&&S.mode!=="cloud" ? c.map(([id,name])=>({src:REF.cdn+id+".jpg?w=400&q=70",name})) : [];
+}
 function drawChase(){
-  const el=$("#chase"), tcg=focusTcg(), list=API.chase[tcg];
-  if(!list){ if(tcg==="pokemon"||tcg==="yugioh") loadChase(tcg); if(el.dataset.k!==""){ el.dataset.k=""; el.innerHTML=""; } return; }
-  if(!API.pick[tcg]){ const a=[...list]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } API.pick[tcg]=a.slice(0,5); }
-  const pick=API.pick[tcg], key=tcg+pick.length; if(el.dataset.k===key) return; el.dataset.k=key;
-  const mid=(pick.length-1)/2;
-  el.innerHTML=pick.map((c,i)=>`<img src="${esc(c.src)}" alt="" onload="this.classList.add('in')" onerror="this.remove()" style="transform:rotate(${((i-mid)*7).toFixed(1)}deg) translateY(${Math.round(Math.abs(i-mid)*20)}px);z-index:${10-Math.round(Math.abs(i-mid)*2)}">`).join("");
+  const el=$("#chase"), t=focusTcg(), lists = t==="all" ? ["pokemon","naruto","yugioh","kpdh","onepiece"].map(chaseList) : [chaseList(t)];
+  const mix=[], max=Math.max(0,...lists.map(l=>l.length)); for(let i=0;i<max;i++) for(const l of lists) if(l[i]) mix.push(l[i]);
+  const key=t+":"+mix.length; if(el.dataset.k===key) return; el.dataset.k=key; if(!mix.length){ el.innerHTML=""; return; }
+  if(t!=="all") for(let i=mix.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [mix[i],mix[j]]=[mix[j],mix[i]]; }
+  const n=innerWidth>900?70:44; let html=""; for(let i=0;i<n;i++){ const c=mix[i%mix.length]; html+=`<img src="${esc(c.src)}" alt="" onload="this.classList.add('in')" onerror="this.style.visibility='hidden'">`; }
+  el.innerHTML=html;
 }
 
 /* ---------- render ---------- */
@@ -524,7 +529,8 @@ function vHot(){
 
 /* ---------- sets ---------- */
 function hue(str){ let h=0; for(const ch of str) h=(h*31+ch.charCodeAt(0))%360; return h; }
-function emblem(name,logo){ const h=hue(name), ini=name.replace(/[^A-Za-z0-9 ]/g,"").split(/\s+/).filter(Boolean).slice(0,4).map(w=>/^\d+$/.test(w)?w:w[0].toUpperCase()).join(""); return `<span class="emblem" style="background:radial-gradient(circle at 25% 20%,hsl(${h} 85% 62%),transparent 55%),conic-gradient(from ${h}deg,hsl(${h} 70% 30%),hsl(${(h+70)%360} 75% 38%),hsl(${(h+200)%360} 60% 26%),hsl(${h} 70% 30%))"><b>${esc(ini)}</b>${logo?`<img src="${esc(logo)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>`; }
+function logoUrl(l){ return !l ? "" : /^https?:/.test(l) ? l : (S.mode==="cloud" ? "" : REF.cdn+l); }
+function emblem(name,logo){ logo=logoUrl(logo); const h=hue(name), ini=name.replace(/[^A-Za-z0-9 ]/g,"").split(/\s+/).filter(Boolean).slice(0,4).map(w=>/^\d+$/.test(w)?w:w[0].toUpperCase()).join(""); return `<span class="emblem" style="background:radial-gradient(circle at 25% 20%,hsl(${h} 85% 62%),transparent 55%),conic-gradient(from ${h}deg,hsl(${h} 70% 30%),hsl(${(h+70)%360} 75% 38%),hsl(${(h+200)%360} 60% 26%),hsl(${h} 70% 30%))"><b>${esc(ini)}</b>${logo?`<img src="${esc(logo)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>`; }
 function setList(tcg){ return S.liveSets[tcg]||REF.setList[tcg]||[]; }
 function cardsInSet(tcg,name){ const b=normSet(name); return cards().filter(c=>{ if(c.tcg!==tcg) return false; const a=normSet(c.set); return a&&(a===b||a.includes(b)||b.includes(a)); }); }
 function ownsCatalog(tcg,setName,cc){ const b=normSet(setName), n=normNum(cc.number), id=normId(cc.id); return cards().some(c=>c.tcg===tcg&&((c.id&&normId(String(c.id).replace(/^rc_/,""))===id)||(c.catalogId&&normId(c.catalogId)===id)||(normSet(c.set)===b&&n&&normNum(c.number)===n))); }
@@ -536,10 +542,15 @@ function vSets(){
   return `<h2>Sets</h2><div class="chips scrollx" style="margin-bottom:14px">${tabs.map(t=>`<button class="chip ${tcg===t.id?"on":""}" data-act="set-tcg" data-v="${t.id}">${esc(t.label)}</button>`).join("")}</div>
   <div class="gallery">${[...list,...extra].map(x=>{ const own=cardsInSet(tcg,x.name), n=own.reduce((a,c)=>a+(c.qty||1),0), lad=x.ladder&&REF.sets[x.ladder], total=lad?lad.ladder.reduce((a,r)=>a+r.designs,0):x.total;
     return `<button class="hit" style="--tc:${tcgOf(tcg).accent}" data-act="open-set" data-v="${esc(x.name)}">${emblem(x.name,x.logo)}<span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(x.name)}</b><span class="muted small" style="display:block">${esc([x.era,x.when].filter(Boolean).join(" · "))}</span><span class="pills">${n?`<span class="pill acc">${n} in your vault</span>`:""}${total?`<span class="pill">${total} cards</span>`:""}${lad?`<span class="pill unv">numbered tiers</span>`:""}</span></span></button>`; }).join("")||`<div class="empty">No set list for this game yet. Sets appear here as you add cards.</div>`}</div>
-  ${S.liveSets[tcg]?"":`<p class="muted small" style="margin-top:14px">${S.mode==="cloud"?`Set logos and full card lists with pictures load on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>. Inside Claude you see generated badges and your own cards.`:(tcg==="pokemon"||tcg==="yugioh")?"Loading the live set list.":"There is no public card database for this game, so these badges are generated."}</p>`}`;
+  ${S.liveSets[tcg]?"":`<p class="muted small" style="margin-top:14px">${S.mode==="cloud"?`Set logos and full card lists with pictures load on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>. Inside Claude you see generated badges and your own cards.`:(tcg==="pokemon"||tcg==="yugioh")?"Loading the live set list.":`Set art from <a href="${REF.artCredit.url}" target="_blank" rel="noopener">${REF.artCredit.label}</a>.`}</p>`}`;
 }
+function expandCatalog(k){ const c=REF.catalog&&REF.catalog[k]; if(!c) return null; if(c._x) return c._x; const out=[]; let n=0; const runs={}; ((REF.sets[k]||{}).ladder||[]).forEach(r=>runs[r.code]=r.run);
+  for(const [code,v] of c.tiers){ const cnt=Array.isArray(v)?v.length:v; for(let i=0;i<cnt;i++){ n++; const num=c.prefix+code+"-"+String(i+1).padStart(3,"0"); out.push({id:num,name:Array.isArray(v)?v[i]:(code==="HR"?"Story Flashback":"Story Recap")+" "+(i+1),number:num,rarity:code,run:runs[code]||null,img:REF.cdn+(c.base+n)+".jpg?w=400&q=70",big:REF.cdn+(c.base+n)+".jpg?w=800&q=80"}); } }
+  return c._x=out; }
+function setData(o){ if(o.catalog){ const x=expandCatalog(o.catalog); if(x) return {cards:x,meta:{}}; } return API.setCards[o.tcg+":"+(o.id||o.name)]; }
+function maybeOwns(tcg,setName,cc){ const b=normSet(setName), nm=normSet(cc.name); return !!cc.rarity&&cards().some(c=>c.tcg===tcg&&normSet(c.set)===b&&!c.number&&(c.rarity||"").replace(/\s*\(.*$/,"")===cc.rarity&&(()=>{ const a=normSet(c.character||c.name); return a&&(a.includes(nm)||nm.includes(a)); })()); }
 function vSetDetail(){
-  const o=S.setOpen, tcg=o.tcg, tc=tcgOf(tcg), own=cardsInSet(tcg,o.name), key=tcg+":"+(o.id||o.name), data=API.setCards[key], lad=o.ladder&&REF.sets[o.ladder];
+  const o=S.setOpen, tcg=o.tcg, tc=tcgOf(tcg), own=cardsInSet(tcg,o.name), key=tcg+":"+(o.id||o.name), data=setData(o), lad=o.ladder&&REF.sets[o.ladder];
   const list=data&&data.cards||[], meta=data&&data.meta||{}, total=lad?lad.ladder.reduce((a,r)=>a+r.designs,0):(list.length||o.total), have=list.filter(cc=>ownsCatalog(tcg,o.name,cc)).length, shown=list.slice(0,S.setMore||60);
   const byRar=r=>own.filter(c=>(c.rarity||"").replace(/\s*\(.*$/,"")===r).reduce((a,c)=>a+(c.qty||1),0);
   return `<p style="margin:0 0 12px"><button class="btn ghost" data-act="set-back">&larr; All ${esc(tc.label)} sets</button></p>
@@ -549,8 +560,8 @@ function vSetDetail(){
   <div class="sec">Your cards from this set</div>${own.length?`<div class="list">${own.sort((a,b)=>(b.raw||0)-(a.raw||0)).map(cardRow).join("")}</div>`:`<div class="empty">None in the vault yet.</div>`}
   <div class="sec">Full card list${list.length?", chase cards first":""}</div>
   ${data&&data.loading?`<progress></progress><p class="muted small">Loading the card list.</p>`
-   :list.length?`<div class="gallery">${shown.map((cc,i)=>{ const got=ownsCatalog(tcg,o.name,cc); return `<button class="hit" style="--tc:${tc.accent}" data-act="add-setcard" data-i="${i}"><span class="art">${esc(SHORT[tcg])}${cc.img?`<img src="${esc(cc.img)}" alt="${esc(cc.name)}" loading="lazy" onerror="this.remove()">`:""}${got?`<span class="pill good own">owned</span>`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(cc.name)}</b><span class="muted small" style="display:block">${esc(["#"+cc.number,cc.rarity].filter(Boolean).join(" · "))}</span></span></button>`; }).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="set-more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}<p class="muted small">Tap a card to add it to your vault.</p>`
-   :`<div class="empty">${S.mode==="cloud"&&(tcg==="pokemon"||tcg==="yugioh")?`The full list with card pictures loads on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>.`:data&&data.err?"The card list could not be loaded right now. Try again in a minute.":"There is no public card database with pictures for this set."}</div>`}`;
+   :list.length?`<div class="gallery">${shown.map((cc,i)=>{ const got=ownsCatalog(tcg,o.name,cc); const maybe=!got&&maybeOwns(tcg,o.name,cc); return `<button class="hit" style="--tc:${tc.accent}" data-act="add-setcard" data-i="${i}"><span class="art">${esc(SHORT[tcg])}${cc.img?`<img src="${esc(cc.img)}" alt="${esc(cc.name)}" loading="lazy" onerror="this.remove()">`:""}${got?`<span class="pill good own">owned</span>`:maybe?`<span class="pill warn own">could be yours</span>`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(cc.name)}</b><span class="muted small" style="display:block">${esc([(/^[A-Z]/.test(cc.number)?"":"#")+cc.number,cc.rarity&&!cc.number.includes("-"+cc.rarity+"-")?cc.rarity:"",cc.run?"numbered /"+cc.run:""].filter(Boolean).join(" · "))}</span></span></button>`; }).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="set-more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}<p class="muted small">Tap a card to add it to your vault.${o.catalog?` Card pictures from <a href="${esc(o.url||REF.artCredit.url)}" target="_blank" rel="noopener">${esc(REF.artCredit.label)}</a>. "Could be yours" means you have a card with that character and rarity but no code saved yet.`:""}</p>`
+   :`<div class="empty">${S.mode==="cloud"&&(tcg==="pokemon"||tcg==="yugioh")?`The full list with card pictures loads on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>.`:data&&data.err?"The card list could not be loaded right now. Try again in a minute.":o.url?`The full card list with pictures and prices is on <a href="${esc(o.url)}" target="_blank" rel="noopener">DeckTradr</a>.`:"There is no public card database with pictures for this set."}</div>`}`;
 }
 async function loadLiveSets(tcg){
   if(S.liveSets[tcg]||API.busy["s"+tcg]||S.net==="blocked") return; API.busy["s"+tcg]=1;
@@ -574,7 +585,8 @@ async function loadSetCards(){
 }
 async function pokeDetail(id){ try{ const d=await getJSON(TD+"/cards/"+encodeURIComponent(id)); let price=null; const tp=d.pricing&&d.pricing.tcgplayer; if(tp) for(const k of Object.keys(tp)){ const v=tp[k]; if(v&&typeof v==="object"&&v.marketPrice!=null){ price=Math.max(price||0,v.marketPrice); } } return {rarity:d.rarity||"",price,setName:d.set&&d.set.name||""}; }catch(e){ return {}; } }
 async function addCatalogCard(tcg,setName,cc){
-  toast("Getting card details."); let extra={}; if(tcg==="pokemon") extra=await pokeDetail(cc.id);
+  let extra={}; if(tcg==="pokemon"){ toast("Getting card details."); extra=await pokeDetail(cc.id); }
+  if(tcg==="naruto"||tcg==="kpdh"){ cardSheet({tcg,name:cc.name,character:cc.name,set:setName,number:cc.number,rarity:cc.rarity||"",imageUrl:cc.big||cc.img||"",catalogId:cc.id,serial:cc.run?"unverified":"no",serialRun:cc.run?String(cc.run):"",source:"catalog",isHit:!!cc.run},true); return; }
   const raw=extra.price!=null?extra.price:(cc.price!=null?cc.price:null);
   cardSheet({tcg,name:cc.name,set:setName||extra.setName||"",number:cc.number||"",rarity:extra.rarity||cc.rarity||"",imageUrl:cc.big||cc.img||"",catalogId:cc.id,raw,rawStatus:raw!=null?"estimate":"unverified",serial:"no",source:"catalog"},true);
 }
@@ -796,7 +808,7 @@ document.addEventListener("click", async e=>{
   else if(a==="open-set"){ const x=[...setList(S.setTcg)].find(z=>z.name===v)||{name:v}; S.setOpen={tcg:S.setTcg,...x}; S.setMore=60; render(); window.scrollTo(0,0); loadSetCards(); }
   else if(a==="set-back"){ S.setOpen=null; render(); }
   else if(a==="set-more"){ S.setMore=(S.setMore||60)+60; render(); }
-  else if(a==="add-setcard"){ const o=S.setOpen, d=o&&API.setCards[o.tcg+":"+(o.id||o.name)], cc=d&&d.cards&&d.cards[+b.dataset.i]; if(cc) addCatalogCard(o.tcg,o.name,cc); }
+  else if(a==="add-setcard"){ const o=S.setOpen, d=o&&setData(o), cc=d&&d.cards&&d.cards[+b.dataset.i]; if(cc) addCatalogCard(o.tcg,o.name,cc); }
   else if(a==="do-search") doSearch();
   else if(a==="add-result"&&S.search.results[+b.dataset.i]&&S.search.results[+b.dataset.i].tdId){ const r=S.search.results[+b.dataset.i]; addCatalogCard("pokemon",r.set,{id:r.tdId,name:r.name,number:r.number,big:r.imageUrl,img:r.img}); }
   else if(a==="add-result"){ const r=S.search.results[+b.dataset.i]; if(r) cardSheet({tcg:r.tcg,name:r.name,set:r.set,number:r.number,rarity:r.rarity,imageUrl:r.imageUrl||"",raw:r.raw,rawStatus:r.raw!=null?"estimate":"unverified",serial:r.tcg==="naruto"||r.tcg==="kpdh"?"unverified":"no",source:"search"},true); }
