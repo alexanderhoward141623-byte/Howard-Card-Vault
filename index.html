@@ -399,12 +399,14 @@ async function bulkApply(patch,label){ const ids=[...S.sel]; if(!ids.length) ret
 /* ---------- market values ---------- */
 const MK={busy:false,done:0,total:0,cache:{}};
 function ebay(q,extra){ return "https://www.ebay.com/sch/i.html?LH_BIN=1&_nkw="+encodeURIComponent((q+" "+(extra||"")).trim()); }
+function gradedFor(c){ const G=REF.graded&&REF.graded.items; if(!G||!c) return null; const k=String(c.id||"").replace(/^rc_/,""); return G[k]||null; }
 function compLinks(c){ const nm=c.name||c.character, q=[nm,c.number,c.tcg==="naruto"||c.tcg==="kpdh"?"Kayou":"",c.set].filter(Boolean).join(" "); const out=[["Raw listings",ebay(q)],["PSA 10 listings",ebay(q,"PSA 10")],["BGS 10 listings",ebay(q,"BGS 10")],["BGS 9.5 listings",ebay(q,"BGS 9.5")]];
   if(["pokemon","yugioh","onepiece"].includes(c.tcg)) out.unshift(["Graded price guide","https://www.pricecharting.com/search-products?type=prices&q="+encodeURIComponent([String(nm||"").replace(/\s*\(alt art\)/,""),String(c.number||"").split("/")[0].replace(/^[A-Za-z]+(?=\d+$)/,""),c.set].filter(Boolean).join(" "))]); return out; }
 function tdCandidates(c){ if(c.catalogId&&c.tcg==="pokemon") return [c.catalogId]; const m=String(c.id||"").match(/^rc_([a-z]+?)(\d+)?(pt5)?-(.+)$/i); if(!m||/_ja/.test(c.id)) return []; let [,a,n,pt,num]=m; a=a.toLowerCase(); const half=pt?".5":"";
   if(a==="me"&&n==="55") return ["30th-"+num.padStart(3,"0"),"30th-"+num]; const sets=n?[...new Set([a+n.padStart(2,"0")+half,a+n+half])]:[a]; const nums=[...new Set([num,num.padStart(3,"0")])]; const out=[]; for(const st of sets) for(const k of nums) out.push(st+"-"+k); return out; }
 async function tdCard(id){ const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),10000); try{ const r=await fetch(TD+"/cards/"+encodeURIComponent(id),{signal:ctl.signal}); if(r.status===404) return null; if(!r.ok) throw new Error("http"); const j=await r.json(); return j&&j.id?j:null; } finally{ clearTimeout(t); } }
-async function marketFor(c){
+async function marketFor(c){ const out=await marketCore(c); if(!out._g){ out._g=1; const g=gradedFor(c); if(g){ [["BGS 10",g[0]],["PSA 10",g[1]],["Grade 9.5",g[2]],["Grade 9",g[3]]].forEach(([l,v])=>{ if(v!=null) out.rows.push([l+", sold-based",v]); }); if(g[0]!=null){ out.bgs=g[0]; out.bgsNote=REF.graded.source+", "+REF.graded.asOf; } if(g[5]) out.links.unshift(["Graded sales page","https://www.pricecharting.com/game/"+g[5]]); } } return out; }
+async function marketCore(c){
   const key=c.tcg+"|"+(c.catalogId||c.id||"")+"|"+(c.number||"")+"|"+(c.name||"")+"|"+(c.finish||""); if(MK.cache[key]) return MK.cache[key];
   const out={raw:null,rows:[],source:"",asOf:"",note:"",links:compLinks(c)};
   if(c.tcg==="naruto"||c.tcg==="kpdh"){ const kp=REF.kayouPrice||{}, cat={priceSource:kp.source,priceAsOf:kp.asOf,priceUrl:REF.artCredit.url}, list=Object.keys(REF.catalog||{}).filter(k=>REF.catalog[k].type!=="op").flatMap(k=>expandCatalog(k)||[]), nc=v=>String(v||"").toLowerCase().replace(/\u25c7/g,"d").replace(/[^a-z0-9]/g,""), hit=c.number&&list.find(x=>nc(x.number)===nc(String(c.number).replace(/L\d$/i,"")));
@@ -438,12 +440,13 @@ function marketHtml(m){ if(!m) return `<span class="muted small">Looking up mark
   return `${ed?`<div class="row" style="gap:8px;flex-wrap:wrap"><span class="small">Latest quote is <b>${money(m.raw)}</b>. Your saved value is ${money(draft.obj.raw)}${draft.obj.rawStatus==="verified"?", marked verified":""}.</span><button type="button" class="btn" data-act="mkt-apply">Use ${money(m.raw)}</button></div>`:""}`+`${m.rows.length?`<table class="mk">${m.rows.map(r=>`<tr><td>${esc(r[0])}</td><td class="n"><b>${cur(r[1],r[4])}</b>${r[2]!=null&&r[3]!=null?`<div class="muted small">${cur(r[2],r[4])} to ${cur(r[3],r[4])}</div>`:""}</td></tr>`).join("")}</table><span class="muted small">${esc([m.source,m.asOf].filter(Boolean).join(", "))}</span>`:""}${m.note?`<span class="muted small">${esc(m.note)}</span>`:""}
    <div class="chips">${m.links.map(([l,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`).join("")}</div><span class="muted small">PSA and BGS open current eBay listings for this exact card, no sign in needed.${m.links.some(l=>l[0]==="Graded price guide")?" The graded price guide shows PSA 10 and BGS 10 values on PriceCharting.":""}</span>`; }
 async function loadSheetMarket(){ const d=draft; if(!d||d.kind!=="card"||d.market||d.mkBusy) return; d.mkBusy=true; let m; try{ m=await marketFor(d.obj); }catch(e){ m={raw:null,rows:[],note:"Prices could not be reached.",links:compLinks(d.obj)}; }
-  d.mkBusy=false; if(draft!==d) return; d.market=m; const c=d.obj; readCardForm(); if(m.raw!=null&&(c.raw==null||c.raw==="")&&c.rawStatus!=="verified"){ c.raw=m.raw; c.rawStatus="estimate"; c.rawSource="market"; c.rawNote=[m.source,m.asOf].filter(Boolean).join(", "); if(m.catalogId) c.catalogId=m.catalogId; drawCardSheet(); } else { const el=$("#mkt"); if(el) el.innerHTML=marketHtml(m); } }
-async function marketRefresh(){ if(MK.busy) return; const live=S.mode!=="cloud", all=filtered(), list=all.filter(c=>c.tcg==="naruto"||c.tcg==="kpdh"||(live&&(c.tcg==="pokemon"||c.tcg==="yugioh"||c.tcg==="onepiece"))); MK.cache={}; API.op={}; MK.busy=true; MK.done=0; MK.total=list.length; render(); let up=0, same=0, none=0, fail=0, kept=0;
-  for(const c of list){ try{ const m=await marketFor(c); if(m.raw==null){ if(/could not be reached/.test(m.note||"")) fail++; else none++; } else if(c.rawStatus==="verified"&&c.raw!=null) kept++; else if(c.raw===m.raw&&c.rawSource==="market") same++; else { const next={...c,raw:m.raw,rawStatus:"estimate",rawSource:"market",rawNote:[m.source,m.asOf].filter(Boolean).join(", ")}; if(m.catalogId) next.catalogId=m.catalogId;
+  d.mkBusy=false; if(draft!==d) return; d.market=m; const c=d.obj; readCardForm(); if(m.bgs!=null&&(c.bgs==null||c.bgs==="")&&c.bgsStatus!=="verified"){ c.bgs=m.bgs; c.bgsStatus="estimate"; c.bgsSource="market"; c.bgsNote=m.bgsNote||""; d.bgsFilled=true; }
+  let fill=!!d.bgsFilled; d.bgsFilled=false; if(m.raw!=null&&(c.raw==null||c.raw==="")&&c.rawStatus!=="verified"){ c.raw=m.raw; c.rawStatus="estimate"; c.rawSource="market"; c.rawNote=[m.source,m.asOf].filter(Boolean).join(", "); if(m.catalogId) c.catalogId=m.catalogId; fill=true; } if(fill) drawCardSheet(); else { const el=$("#mkt"); if(el) el.innerHTML=marketHtml(m); } }
+async function marketRefresh(){ if(MK.busy) return; const live=S.mode!=="cloud", all=filtered(), list=all.filter(c=>c.tcg==="naruto"||c.tcg==="kpdh"||(live&&(c.tcg==="pokemon"||c.tcg==="yugioh"||c.tcg==="onepiece"))); MK.cache={}; API.op={}; MK.busy=true; MK.done=0; MK.total=list.length; render(); let up=0, same=0, none=0, fail=0, kept=0, graded=0;
+  for(let c of list){ try{ const m=await marketFor(c); if(m.bgs!=null&&c.bgsStatus!=="verified"&&c.bgs!==m.bgs&&(c.bgs==null||c.bgsSource==="market")){ const nb={...c,bgs:m.bgs,bgsStatus:"estimate",bgsSource:"market",bgsNote:m.bgsNote||""}; if(S.mode==="local") S.cards.set(c.id,nb); else { const {id,...data}=nb; data.updatedAt=Date.now(); await db.doc("cards/"+id).set(data); } c=nb; graded++; } if(m.raw==null){ if(/could not be reached/.test(m.note||"")) fail++; else none++; } else if(c.rawStatus==="verified"&&c.raw!=null) kept++; else if(c.raw===m.raw&&c.rawSource==="market") same++; else { const next={...c,raw:m.raw,rawStatus:"estimate",rawSource:"market",rawNote:[m.source,m.asOf].filter(Boolean).join(", ")}; if(m.catalogId) next.catalogId=m.catalogId;
         if(S.mode==="local"){ S.cards.set(c.id,next); } else { const {id,...data}=next; data.updatedAt=Date.now(); await db.doc("cards/"+id).set(data); } up++; } }catch(e){ fail++; }
     MK.done++; if(MK.done%6===0){ const b=document.querySelector("[data-act=mkt-refresh]"); if(b) b.textContent=`Updating ${MK.done} of ${MK.total}`; } }
-  const saved=S.mode!=="local"||saveLocal(); MK.busy=false; const skip=all.length-list.length; S.mkReport=[`${up} updated`,`${same} unchanged`,none?`${none} with no price available`:"",fail?`${fail} failed to load`:"",kept?`${kept} verified values left alone`:"",skip?`${skip} skipped (no price feed${live?"":" inside Claude"})`:""].filter(Boolean).join(", ")+"."; if(saved) toast("Market refresh: "+S.mkReport); render(); }
+  const saved=S.mode!=="local"||saveLocal(); MK.busy=false; const skip=all.length-list.length; S.mkReport=[`${up} updated`,`${same} unchanged`,graded?`${graded} Beckett 10 values filled from sold listings`:"",none?`${none} with no price available`:"",fail?`${fail} failed to load`:"",kept?`${kept} verified values left alone`:"",skip?`${skip} skipped (no price feed${live?"":" inside Claude"})`:""].filter(Boolean).join(", ")+"."; if(saved) toast("Market refresh: "+S.mkReport); render(); }
 function viewSheet(tcg,setName,cc){ const c={tcg,name:cc.name,set:setName,number:cc.number,rarity:cc.rarity||"",catalogId:cc.id}, rule=serialRule(c); draft={kind:"view",tcg,setName,cc};
   openSheet(`<div class="stack"><div class="row"><h2 style="margin:0" class="grow">${esc(cc.name)}</h2><button type="button" class="btn ghost" data-act="close">Close</button></div>
    <div class="row" style="align-items:flex-start">${cc.big||cc.img?`<img class="preview big" src="${esc(cc.big||cc.img)}" alt="${esc(cc.name)}" onerror="this.remove()">`:""}<div class="grow stack"><div class="muted">${esc([tcgOf(tcg).label,setName].join(" · "))}</div><div class="pills">${cc.number?`<span class="pill">${esc(cc.number)}</span>`:""}${cc.rarity?`<span class="pill">${esc(cc.rarity)}</span>`:""}${rule.mode==="always"?`<span class="pill acc">numbered /${rule.run}</span>`:rule.mode==="never"?`<span class="pill">not numbered</span>`:""}${ownsCatalog(tcg,setName,cc)?`<span class="pill good">owned</span>`:""}</div>
@@ -709,8 +712,8 @@ async function loadLiveSets(tcg){
   }catch(e){ if(netFail()) setTimeout(()=>{ if(S.view==="sets") loadLiveSets(tcg); },retryIn()); }
   API.busy["s"+tcg]=0;
 }
-async function loadSetCards(){
-  const o=S.setOpen; if(!o||S.net==="blocked") return; const key=o.tcg+":"+(o.id||o.name); if(API.setCards[key]) return;
+async function loadSetCards(o0){
+  const o=o0||S.setOpen; if(!o||S.net==="blocked") return; const key=o.tcg+":"+(o.id||o.name); if(API.setCards[key]) return;
   const op=o.tcg==="onepiece"&&o.catalog&&S.mode!=="cloud"; if(!((o.tcg==="pokemon"&&o.id)||o.tcg==="yugioh"||op)) return;
   API.setCards[key]={loading:true}; if(!op) render();
   try{ let list=[], meta={};
@@ -759,18 +762,42 @@ function cardSheet(c, isNew){
   draft={kind:"card",isNew,obj:{qty:1,serial:"unverified",rawStatus:"unverified",bgsStatus:"unverified",decision:"undecided",reasons:[],tcg:S.f.tcg!=="all"?S.f.tcg:"naruto",owner:S.f.owner!=="all"?S.f.owner:S.settings.owners[0],...c}};
   drawCardSheet();
 }
+function setObj(c){ const b=normSet(c.set); return b?setList(c.tcg).find(x=>normSet(x.name)===b):null; }
+function pickList(){ const c=draft.obj, o=setObj(c), d=o&&setData({tcg:c.tcg,...o}), q=(draft.pickQ||"").trim().toLowerCase(); const all=d&&d.cards||[]; return {o,d,all,list:q?all.filter(x=>(x.name+" "+x.number+" "+(x.rarity||"")).toLowerCase().includes(q)):all}; }
+function pickGrid(){ const {d,all,list}=pickList(); if(!all.length) return d&&d.err?`<p class="note">The card list for this set could not be loaded. Go back and type the card in.</p>`:`<p class="muted">Loading the card list.</p><progress></progress>`;
+  return `<p class="muted small">${list.length} of ${all.length} cards${list.length>90?", showing the first 90. Type to narrow it down.":""}</p><div class="gallery">${list.slice(0,90).map(x=>`<button type="button" class="hit" style="--tc:${tcgOf(draft.obj.tcg).accent}" data-act="pick-card" data-i="${all.indexOf(x)}"><span class="art">${esc(SHORT[draft.obj.tcg]||"")}${x.img&&S.mode!=="cloud"?`<img src="${esc(x.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span><span class="cap"><b style="overflow-wrap:anywhere">${esc(x.name)}</b><span class="muted small" style="display:block">${esc([x.number===x.name?"":x.number,x.rarity].filter(Boolean).join(" · "))}</span></span></button>`).join("")}</div>`; }
+function drawPicker(){ const c=draft.obj; openSheet(`<div class="stack"><div class="row"><h2 style="margin:0" class="grow">Pick the card</h2><button type="button" class="btn ghost" data-act="pick-close">Back</button></div><span class="muted">${esc(c.set)}</span><input type="search" id="pickQ" placeholder="Name, number or rarity" value="${esc(draft.pickQ||"")}"><div id="pickGrid">${pickGrid()}</div></div>`); }
+function matchCatalog(c){ if(c.tcg!=="naruto"&&c.tcg!=="kpdh") return false; const nn=v=>String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,""); let hit=null, sname="";
+  for(const e of REF.setList[c.tcg]||[]){ if(!e.catalog) continue; if(c.set&&normSet(e.name)!==normSet(c.set)&&c.number===""&&false) continue; const L=expandCatalog(e.catalog)||[]; let h=c.number?L.find(x=>nn(x.number)===nn(c.number)):null;
+    if(!h&&(!c.set||normSet(e.name)===normSet(c.set))){ const nm=normSet(c.character||c.name), m=nm?L.filter(x=>normSet(x.name)===nm&&(!c.rarity||x.rarity===String(c.rarity).toUpperCase())):[]; if(m.length===1) h=m[0]; }
+    if(h){ hit=h; sname=e.name; break; } }
+  if(!hit) return false; applyPick(c,hit,sname); return true; }
+function applyPick(c,x,setName){ c.name=x.name; if(!c.character&&(c.tcg==="naruto"||c.tcg==="kpdh")&&!/^(Story|[A-Z]+ \d)/.test(x.name)) c.character=x.name; c.number=x.number===x.name&&c.tcg!=="onepiece"?c.number:x.number; if(x.rarity) c.rarity=x.rarity; if(setName) c.set=setName; c.catalogId=x.id; if(x.big||x.img) c.imageUrl=x.big||x.img;
+  if(x.price&&(c.raw==null||c.raw==="")&&c.rawStatus!=="verified"){ c.raw=x.price; c.rawStatus="estimate"; c.rawSource="market"; c.rawNote=c.tcg==="onepiece"?"OPTCG API market":c.tcg==="pokemon"?"TCGplayer market":"DeckTradr market, "+((REF.kayouPrice||{}).asOf||""); } }
+async function formPhoto(b){ const d=draft; if(!d||d.kind!=="card") return; readCardForm(); pendingPhoto=b;
+  if(!(sample&&sampleImages)){ d.photoNote="Photo attached. Reading a card from a photo only works in the Claude copy of the vault. On this site, choose the set, then tap Pick the card."; drawCardSheet(); return; }
+  d.photoNote="Claude is reading the card. This can take up to a minute."; d.reading=true; drawCardSheet();
+  const {guess,note}=await claudeRead(b); if(draft!==d) return; readCardForm(); const c=d.obj, str=v=>typeof v==="string"?v.trim():""; pendingPhoto=b;
+  if(d.isNew&&!c.name&&!c.character&&REF.tcgs.some(t=>t.id===guess.tcg)) c.tcg=guess.tcg;
+  ["name","character","set","number","rarity"].forEach(k=>{ if(!c[k]&&str(guess[k])) c[k]=str(guess[k]); });
+  if(c.serial!=="yes"&&guess.serialVisible==="yes"&&str(guess.serialNo)){ c.serial="yes"; c.serialNo=str(guess.serialNo); c.serialRun=str(guess.serialRun); }
+  const so=setObj(c); if(so) c.set=so.name; const matched=matchCatalog(c);
+  d.reading=false; d.photoNote=note+(matched?" Matched to "+c.number+" in the set list.":""); d.market=null; drawCardSheet(); }
 function drawCardSheet(){
+  if(draft.picking){ drawPicker(); return; }
   const c=draft.obj, src=pendingPhoto?URL.createObjectURL(pendingPhoto):imgSrc(c), ps=products().filter(p=>p.tcg===c.tcg), rule=serialRule(c);
   if(rule.mode==="never") c.serial="no"; else if(rule.mode==="always"&&c.serial==="no") c.serial="unverified";
   setTimeout(loadSheetMarket,0);
   const stat=k=>seg(k,[["verified","Verified"],["estimate","Estimate"],["unverified","Unverified"]],c[k]);
   openSheet(`<form id="cardForm" class="stack" autocomplete="off">
    <div class="row"><h2 style="margin:0" class="grow">${draft.isNew?"Add a card":"Edit card"}</h2><button type="button" class="btn ghost" data-act="close">Close</button></div>
+   ${draft.photoNote?`<div class="note">${esc(draft.photoNote)}${draft.reading?"<progress></progress>":""}</div>`:""}
    <div class="row" style="align-items:flex-start">${src?`<img class="preview" src="${esc(src)}" alt="Card photo" onerror="this.remove()">`:""}<div class="grow stack"><label class="f">Card name<input type="text" id="cName" value="${esc(c.name)}" placeholder="What the card says"></label><label class="f">Character<input type="text" id="cChar" value="${esc(c.character)}"></label>
      <div class="row"><label class="btn" for="cPhoto">${src?"Replace photo":"Add photo"}</label><input type="file" id="cPhoto" accept="image/*" hidden></div></div></div>
    <div class="grid2"><label class="f">Game<select id="cTcg">${REF.tcgs.map(t=>`<option value="${t.id}" ${c.tcg===t.id?"selected":""}>${esc(t.label)}</option>`).join("")}</select></label>
      <label class="f">Collector<select id="cOwner">${S.settings.owners.map(o=>`<option ${c.owner===o?"selected":""}>${esc(o)}</option>`).join("")}</select></label></div>
-   <div class="grid3"><label class="f">Set<input type="text" id="cSet" value="${esc(c.set)}"></label><label class="f">Card number<input type="text" id="cNumber" value="${esc(c.number)}"></label>
+   <div class="grid3">${(()=>{ const names=[...new Set([...setList(c.tcg).map(x=>x.name),...cards().filter(x=>x.tcg===c.tcg&&x.set).map(x=>x.set)])], known=names.some(n=>n===c.set), other=draft.setOther||(!!c.set&&!known);
+       return `<label class="f">Set<select id="cSetSel"><option value="">Choose a set</option>${names.map(n=>`<option value="${esc(n)}" ${!other&&n===c.set?"selected":""}>${esc(n)}</option>`).join("")}<option value="__other" ${other?"selected":""}>Other, type it in</option></select><input type="${other?"text":"hidden"}" id="cSet" value="${esc(c.set)}" placeholder="Set name" style="margin-top:6px"></label>`; })()}<label class="f">Card number<input type="text" id="cNumber" value="${esc(c.number)}"></label>
      <label class="f">Rarity<input type="text" id="cRarity" list="rarList" value="${esc(c.rarity)}"><datalist id="rarList">${(REF.rarities[c.tcg]||[]).map(r=>`<option value="${esc(r)}">`).join("")}</datalist></label></div>
    <div class="grid3"><label class="f">Pulled from<select id="cProduct"><option value="">${ps.length?"Not from a tracked product":"No "+esc(tcgOf(c.tcg).label)+" products in your Rip log yet"}</option>${ps.map(p=>`<option value="${p.id}" ${c.productId===p.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>
      <label class="f">Pack number<input type="number" inputmode="numeric" id="cPack" value="${c.pack??""}"></label><label class="f">Quantity<input type="number" inputmode="numeric" id="cQty" value="${c.qty||1}"></label></div>
@@ -780,12 +807,14 @@ function drawCardSheet(){
        <label class="f">Language<select id="cLang"><option value="">Not set</option>${LANG.map(([k,l])=>`<option value="${k}" ${c.language===k?"selected":""}>${l}</option>`).join("")}</select></label>
        <label class="f">Grade, if slabbed<input type="text" id="cGrade" value="${esc(c.grade||"")}" placeholder="e.g. PSA 10"></label></div>
      <span class="muted small">${c.tcg==="pokemon"?"Market value follows the finish you pick. ":""}Market quotes are for near mint, ungraded copies.</span></details>
+   ${setObj(c)?`<button type="button" class="btn" data-act="pick-open">Pick the card from ${esc(c.set)}</button>`:""}
    <div class="inset"><b>Serial number</b>${rule.mode==="never"?`<span class="muted small">This card has no numbered version, so there is nothing to check.</span>`:rule.mode==="always"?seg("serial",[["unverified","Stamp not recorded"],["yes","Record my number"]],c.serial==="yes"?"yes":"unverified"):seg("serial",[["unverified","Unverified"],["yes","Numbered"],["no","Not numbered"]],c.serial)}
      ${rule.mode==="never"?"":c.serial==="yes"?`<div class="grid2"><label class="f">Your copy<input type="text" id="cSerialNo" value="${esc(c.serialNo)}" placeholder="e.g. 042"></label><label class="f">Out of<input type="text" id="cSerialRun" value="${esc(rule.run||c.serialRun)}" placeholder="e.g. 220" ${rule.run?"readonly":""}></label></div>`:rule.mode==="always"?`<span class="muted small">Every ${esc(c.rarity)} in this set is numbered out of ${rule.run}. Record your stamp when you have the card in hand.</span>`:c.serial==="unverified"?`<span class="muted small">Stays flagged until you check it. The Serial check tab walks you through it.</span>`:""}</div>
    <div class="inset"><b>Market value</b><div id="mkt" class="stack" style="gap:8px">${marketHtml(draft.market)}</div></div>
    <div class="inset"><b>Your numbers</b>${c.rawSource==="market"&&c.raw!=null?`<span class="muted small">Raw value filled from the market${c.rawNote?" ("+esc(c.rawNote)+")":""}. Type over it to use your own.</span>`:""}
      <div class="grid2"><label class="f">Raw value<input type="number" inputmode="decimal" step="0.01" id="cRaw" value="${c.raw??""}" placeholder="Leave blank if unknown"></label><div class="f">How sure${stat("rawStatus")}</div></div>
-     <div class="grid2"><label class="f">Beckett 10 estimate<input type="number" inputmode="decimal" step="0.01" id="cBgs" value="${c.bgs??""}" placeholder="Leave blank if unknown"></label><div class="f">How sure${stat("bgsStatus")}</div></div>
+     ${(()=>{ const auto=!draft.bgsManual&&(c.bgs==null||c.bgs===""||c.bgsSource==="market"); return auto?`<div class="grid2"><label class="f">Beckett 10 value, from the market<input type="number" id="cBgs" value="${c.bgs??""}" readonly placeholder="${draft.market&&draft.market.bgs==null?"No graded sales found yet":"Fills in from sold listings"}"></label><div class="f">&nbsp;<button type="button" class="btn" data-act="bgs-manual">Enter my own instead</button></div></div>`:`<div class="grid2"><label class="f">Beckett 10 value, yours<input type="number" inputmode="decimal" step="0.01" id="cBgs" value="${c.bgs??""}" placeholder="From a sold listing you saw"></label><div class="f">How sure${stat("bgsStatus")}</div></div>`; })()}
+     <span class="muted small">${c.bgsSource==="market"&&c.bgs!=null?"Beckett 10 value filled from sold listings ("+esc(c.bgsNote||"")+"). Thin sales can make a graded figure jumpy, so open the graded sales page above before you rely on it. ":"You do not need to enter the Beckett 10 value. It fills in when graded sales data exists for the card. "}</span>
      <span class="muted small">Verified means you saw a sold listing. Estimate means an app or asking price. Unverified means a guess.</span></div>
    <div class="inset"><b>Decision</b>${seg("decision",[["undecided","Undecided"],["keep","Keep"],["trade","Trade"],["sell","Sell"]],c.decision)}
      ${c.decision==="keep"?`<span class="muted small">Why keep it? Loving the card is reason enough.</span><div class="chips">${REASONS.map(r=>`<button type="button" class="chip ${c.reasons.includes(r)?"on":""}" data-act="reason" data-v="${esc(r)}">${esc(r)}</button>`).join("")}</div>`:""}</div>
@@ -797,7 +826,7 @@ function readCardForm(){
   const c=draft.obj, g=id=>{ const e=document.getElementById(id); return e?e.value.trim():undefined; };
   const set=(k,v)=>{ if(v!==undefined) c[k]=v; };
   set("name",g("cName")); set("character",g("cChar")); set("tcg",g("cTcg")); set("owner",g("cOwner")); set("set",g("cSet")); set("number",g("cNumber")); set("rarity",g("cRarity"));
-  { const typed=num(g("cRaw")); if(c.rawSource==="market"&&typed!==c.raw) c.rawSource="mine"; }
+  { const typed=num(g("cRaw")); if(c.rawSource==="market"&&typed!==c.raw) c.rawSource="mine"; const tb=num(g("cBgs")); if(c.bgsSource==="market"&&g("cBgs")!==undefined&&tb!==c.bgs) c.bgsSource="mine"; }
   set("productId",g("cProduct")); c.pack=num(g("cPack")); c.qty=Math.max(1,Math.round(num(g("cQty"))||1)); c.raw=num(g("cRaw")); c.bgs=num(g("cBgs"));
   if(g("cSerialNo")!==undefined){ c.serialNo=g("cSerialNo"); c.serialRun=g("cSerialRun"); }
   { const f0=c.finish||""; set("finish",g("cFinish")); set("condition",g("cCond")); set("language",g("cLang")); set("grade",g("cGrade")); if(c.finish&&!finOpts(c.tcg).some(o=>o[0]===c.finish)) c.finish=""; if((c.finish||"")!==f0) draft.finChanged=true; }
@@ -854,6 +883,13 @@ function ownerSheet(){
 /* ---------- photos ---------- */
 function shrink(file,max,q){ return new Promise((res,rej)=>{ const u=URL.createObjectURL(file), im=new Image(); im.onload=()=>{ const s=Math.min(1,max/Math.max(im.width,im.height)), c=document.createElement("canvas"); c.width=Math.round(im.width*s); c.height=Math.round(im.height*s); c.getContext("2d").drawImage(im,0,0,c.width,c.height); URL.revokeObjectURL(u); c.toBlob(b=>b?res(b):rej(new Error("encode")),"image/jpeg",q); }; im.onerror=()=>{ URL.revokeObjectURL(u); rej(new Error("That file is not a photo this browser can open.")); }; im.src=u; }); }
 function blobToDataURL(b){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(b); }); }
+async function claudeRead(blob){ let guess={}, note="";
+    const prompt=`This photo shows one trading card for a family collection tracker. Read only what is visible and reply with only a JSON object:
+{"tcg": one of ${JSON.stringify(REF.tcgs.map(t=>t.id))}, "name": string, "character": string, "set": string, "number": string, "rarity": string, "serialVisible": "yes" | "no" | "unclear", "serialNo": string, "serialRun": string, "confidence": "high" | "medium" | "low", "notes": string}
+Rules: use "" for anything you cannot read. Never guess a serial number, a print run, or a price. "kpdh" means Kayou KPop Demon Hunters cards. Kayou Naruto card codes look like NRSA03-SE-001 where the middle part is the rarity; put the full code in "number". A serial stamp looks like a small fraction such as 042/220 printed on the card face. "notes" is one short sentence on anything you were unsure about.`;
+    try{ const r=await sample.json(prompt,{images:[blob],cache:false}); if(r&&typeof r==="object") guess=r; note = guess.confidence==="high" ? "Claude read this card with high confidence. Check it against the card before saving." : "Claude was not fully sure about this one. Check every field against the card."; if(guess.notes) note+=" "+String(guess.notes); }
+    catch(e){ const c=e&&e.code; note = c==="not_granted"||c==="sampling_disabled" ? "Card reading is switched off for this visit, so fill in the details by hand." : c==="rate_limited" ? "Claude is busy right now. The photo is attached, fill in the details by hand or try again in a bit." : "Claude could not read that photo. The photo is attached, fill in the details by hand."; }
+  return {guess,note}; }
 async function handleScan(file){
   if(!file) return; S.scan={busy:true,msg:"Getting the photo ready."}; render();
   let blob; try{ blob=await shrink(file,1400,.85); }catch(e){ S.scan={busy:false,msg:e.message||"That photo could not be read. Try another."}; render(); return; }
@@ -951,6 +987,10 @@ document.addEventListener("click", async e=>{
   else if(a==="sel-none"){ S.sel=new Set(); render(); }
   else if(a==="bulk"){ const k=b.dataset.k, on=b.dataset.v==="1"; bulkApply({[k]:on}, k==="isHit"?(on?"Added to hits":"Removed from hits"):(on?"Marked top loaded":"Marked not top loaded")); }
   else if(a==="mkt-refresh") marketRefresh();
+  else if(a==="pick-open"){ const pp=pendingPhoto; readCardForm(); pendingPhoto=pp; const d=draft, c=d.obj, o=setObj(c); d.picking=true; d.pickQ=""; drawCardSheet(); if(o&&!setData({tcg:c.tcg,...o})) loadSetCards({tcg:c.tcg,...o}).then(()=>{ if(draft===d&&d.picking){ const g=$("#pickGrid"); if(g) g.innerHTML=pickGrid(); } }); }
+  else if(a==="bgs-manual"){ const pp=pendingPhoto; readCardForm(); pendingPhoto=pp; draft.bgsManual=true; drawCardSheet(); const e=$("#cBgs"); if(e) e.focus(); }
+  else if(a==="pick-close"){ draft.picking=false; drawCardSheet(); }
+  else if(a==="pick-card"){ const {all,o}=pickList(), x=all[+b.dataset.i]; if(x){ const c=draft.obj; applyPick(c,x,o&&o.name); if(c.tcg==="pokemon"&&c.rawSource==="market"&&!x.price) c.raw=null; draft.picking=false; draft.market=null; drawCardSheet(); } }
   else if(a==="mkt-apply"){ const d=draft, m=d&&d.market; if(d&&d.kind==="card"&&m&&m.raw!=null){ readCardForm(); const c=d.obj; c.raw=m.raw; c.rawStatus="estimate"; c.rawSource="market"; c.rawNote=[m.source,m.asOf].filter(Boolean).join(", "); if(m.catalogId) c.catalogId=m.catalogId; drawCardSheet(); } }
   else if(a==="view-add"){ const d=draft; if(d&&d.kind==="view"){ const m=d.market; closeSheetQuiet(); addCatalogCard(d.tcg,d.setName,d.cc,m); } }
   else if(a==="edit-card"){ const c=S.cards.get(id); if(c) cardSheet({...c,reasons:[...(c.reasons||[])]},false); }
@@ -993,6 +1033,7 @@ document.addEventListener("submit", e=>{ e.preventDefault(); const id=e.target.i
   else if(id==="watchForm"){ const g=i=>document.getElementById(i).value.trim(), o={...draft.obj,name:g("wName"),price:num(g("wPrice")),target:num(g("wTarget")),msrp:num(g("wMsrp")),where:g("wWhere"),seen:g("wSeen")}; if(!o.name){ toast("Name the product first."); return; } if(!o.id){ o.id=uid("w_"); o.createdAt=Date.now(); } put("watch",o).then(closeSheet).catch(()=>{}); }
   else if(id==="ownerForm"){ const n=$("#oName").value.trim(); if(!n) return; if(!S.settings.owners.includes(n)) S.settings.owners=[...S.settings.owners,n]; saveSettings().then(()=>{ toast(n+" added."); closeSheet(); }); }
 });
+document.addEventListener("pointerdown", e=>{ S.submitDown = e.target.closest&&e.target.closest("#cardForm button[type=submit]") ? Date.now() : 0; }, true);
 document.addEventListener("change", e=>{ const t=e.target;
   if(t.id==="cFinish"&&draft&&draft.kind==="card"){ readCardForm(); draft.market=null; const c=draft.obj; if(c.rawSource==="market"&&c.rawStatus!=="verified") c.raw=null; drawCardSheet(); return; }
   if(t.id==="fDecision"){ S.f.decision=t.value; render(); }
@@ -1004,8 +1045,9 @@ document.addEventListener("change", e=>{ const t=e.target;
   else if(t.id==="sheetTcg"){ S.sheet.tcg=t.value; }
   else if(t.id==="sheetOwner"){ S.sheet.owner=t.value; }
   else if(t.dataset.act==="cell-on"){ document.querySelectorAll("[data-cell]").forEach(el=>{ S.sheet.cells[+el.dataset.cell].name=el.value.trim(); }); S.sheet.cells[+t.dataset.i].on=t.checked; render(); }
-  else if(t.id==="cPhoto"){ const f=t.files[0]; if(f) shrink(f,1400,.85).then(b=>{ readCardForm(); pendingPhoto=b; drawCardSheet(); }).catch(()=>toast("That photo could not be read.")); }
-  else if(t.id==="cTcg"||t.id==="cRarity"||t.id==="cSet"||t.id==="cNumber"){ readCardForm(); draft.market=null; drawCardSheet(); }
+  else if(t.id==="cPhoto"){ const f=t.files[0]; if(f) shrink(f,1400,.85).then(b=>formPhoto(b)).catch(()=>toast("That photo could not be read.")); }
+  else if(t.id==="cSetSel"){ const v=t.value, pp=pendingPhoto; readCardForm(); draft.setOther=v==="__other"; if(v!=="__other") draft.obj.set=v; draft.market=null; pendingPhoto=pp; drawCardSheet(); if(draft.setOther){ const e=$("#cSet"); if(e) e.focus(); } }
+  else if(t.id==="cTcg"||t.id==="cRarity"||t.id==="cSet"||t.id==="cNumber"){ const pp=pendingPhoto; readCardForm(); pendingPhoto=pp; if(t.id==="cNumber"&&!draft.obj.name&&!draft.obj.character) matchCatalog(draft.obj); draft.market=null; drawCardSheet(); if(Date.now()-(S.submitDown||0)<900){ S.submitDown=0; saveCard(); } }
   else if(t.id==="bulkDecision"&&t.value){ bulkApply({decision:t.value},"Decision set to "+t.value); }
   else if(t.id==="bulkProduct"&&t.value){ bulkApply({productId:t.value==="-"?"":t.value},"Pulled from updated"); }
   else if(t.id==="bulkOwner"&&t.value){ bulkApply({owner:t.value},"Collector set to "+t.value); }
@@ -1013,7 +1055,7 @@ document.addEventListener("change", e=>{ const t=e.target;
   else if(t.dataset.act==="tick"){ S.serialTicks[t.dataset.i]=t.checked; render(); }
   else if(t.id==="stcg"){ S.search.tcg=t.value; S.search.results=null; S.search.note=""; S.search.q=$("#sq").value; render(); }
 });
-let qt; document.addEventListener("input", e=>{ if(e.target.id==="q"){ S.f.q=e.target.value; clearTimeout(qt); qt=setTimeout(()=>{ S.more=60; render(); const el=$("#q"); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } },250); } });
+let qt; document.addEventListener("input", e=>{ if(e.target.id==="pickQ"&&draft){ draft.pickQ=e.target.value; const g=$("#pickGrid"); if(g) g.innerHTML=pickGrid(); return; } if(e.target.id==="q"){ S.f.q=e.target.value; clearTimeout(qt); qt=setTimeout(()=>{ S.more=60; render(); const el=$("#q"); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } },250); } });
 document.addEventListener("keydown", e=>{ if(e.key==="Enter"&&e.target.id==="sq"){ e.preventDefault(); doSearch(); } if(e.key==="Escape"&&sheetOpen()) closeSheet();
   if(e.key==="Tab"&&sheetOpen()){ const box=$("#sheetBox"), f=[...box.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x=>x.offsetParent!==null); if(!f.length){ e.preventDefault(); return; } const a=document.activeElement, first=f[0], last=f[f.length-1]; if(!box.contains(a)||(e.shiftKey&&(a===first||a===box))){ e.preventDefault(); last.focus(); } else if(!e.shiftKey&&a===last){ e.preventDefault(); first.focus(); } } });
 let rz; addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(drawFoil,150); });
