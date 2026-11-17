@@ -166,16 +166,38 @@ progress{width:100%;accent-color:var(--accent);height:8px}
   #toast{bottom:100px}
 }
 @media (prefers-reduced-motion:no-preference){.card,.hit,.chip,.btn{transition:transform .12s,border-color .12s,background .12s}.card:active,.hit:active{transform:scale(.985)}.card:hover,.hit:hover{border-color:#3a4558}}
+
+:root{--nav:0px}
+.topbar{position:sticky;top:0;z-index:8;background:#0b0f16ec;border-bottom:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding-top:env(safe-area-inset-top,0px)}
+.tbin{max-width:1080px;margin:0 auto;padding:11px 16px 0;display:grid;grid-template-columns:1fr auto;align-items:center;column-gap:12px}
+a.brand{text-decoration:none;color:inherit;min-width:0}
+.tbin .brand h1{font-size:clamp(19px,5.4vw,23px)}
+nav.mainnav{grid-column:1/-1;margin:7px -16px 0}
+nav.mainnav .in{display:flex;padding:0 6px}
+nav.mainnav a{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 4px 10px;text-decoration:none;color:var(--muted);font-size:13.5px;font-weight:650;border-bottom:2px solid transparent;white-space:nowrap}
+nav.mainnav a svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+nav.mainnav a.on{color:var(--text);border-bottom-color:var(--accent)}
+nav.mainnav a.on svg{color:var(--accent)}
+.app{padding-top:16px}
+@media(max-width:400px){nav.mainnav a svg{display:none}}
+@media(min-width:900px){
+  .tbin{grid-template-columns:auto 1fr auto;padding:0 16px;column-gap:30px}
+  .tbin .sync{order:3}
+  nav.mainnav{grid-column:auto;margin:0;order:2}
+  nav.mainnav .in{padding:0;gap:2px}
+  nav.mainnav a{flex:0 0 auto;padding:21px 15px 19px;font-size:14.5px}
+  nav.mainnav a:hover{color:var(--text)}
+}
 </style>
 </head>
 <body>
 <div id="backdrop"><canvas id="foil"></canvas><div id="chase"></div></div>
+<div class="topbar"><div class="tbin">
+  <a class="brand" href="#collection"><h1>Howard <span>Card Vault</span></h1><p id="tagline" hidden>Rips, hits and values for the family binders.</p></a>
+  <div class="sync"><i class="dot" id="syncDot"></i><span id="syncText">Starting up</span></div>
+  <nav class="mainnav" id="tabs" aria-label="Sections"></nav>
+</div></div>
 <div class="app">
-  <header class="top">
-    <div class="brand"><h1>Howard <span>Card Vault</span></h1><p id="tagline">Rips, hits and values for the family binders.</p></div>
-    <div class="sync"><i class="dot" id="syncDot"></i><span id="syncText">Starting up</span></div>
-  </header>
-  <nav class="bottomnav" id="tabs" aria-label="Sections"></nav>
   <main id="view"></main>
 </div>
 <button class="btn pri fab" id="fab" data-act="new-card" aria-label="Add a card">+</button>
@@ -366,8 +388,9 @@ async function bulkApply(patch,label){ const ids=[...S.sel]; if(!ids.length) ret
 
 /* ---------- market values ---------- */
 const MK={busy:false,done:0,total:0,cache:{}};
-function ebay(q,extra){ return "https://www.ebay.com/sch/i.html?LH_Sold=1&LH_Complete=1&_nkw="+encodeURIComponent((q+" "+(extra||"")).trim()); }
-function compLinks(c){ const q=[c.name||c.character,c.number,c.tcg==="naruto"?"Kayou":"",c.set].filter(Boolean).join(" "); return [["Sold raw",ebay(q)],["Sold PSA 10",ebay(q,"PSA 10")],["Sold BGS 10",ebay(q,"BGS 10")],["Sold BGS 9.5",ebay(q,"BGS 9.5")]]; }
+function ebay(q,extra){ return "https://www.ebay.com/sch/i.html?LH_BIN=1&_nkw="+encodeURIComponent((q+" "+(extra||"")).trim()); }
+function compLinks(c){ const nm=c.name||c.character, q=[nm,c.number,c.tcg==="naruto"||c.tcg==="kpdh"?"Kayou":"",c.set].filter(Boolean).join(" "); const out=[["Raw listings",ebay(q)],["PSA 10 listings",ebay(q,"PSA 10")],["BGS 10 listings",ebay(q,"BGS 10")],["BGS 9.5 listings",ebay(q,"BGS 9.5")]];
+  if(["pokemon","yugioh","onepiece"].includes(c.tcg)) out.unshift(["Graded price guide","https://www.pricecharting.com/search-products?type=prices&q="+encodeURIComponent([String(nm||"").replace(/\s*\(alt art\)/,""),String(c.number||"").split("/")[0].replace(/^[A-Za-z]+(?=\d+$)/,""),c.set].filter(Boolean).join(" "))]); return out; }
 function tdCandidates(c){ if(c.catalogId&&c.tcg==="pokemon") return [c.catalogId]; const m=String(c.id||"").match(/^rc_([a-z]+?)(\d+)?(pt5)?-(.+)$/i); if(!m||/_ja/.test(c.id)) return []; let [,a,n,pt,num]=m; a=a.toLowerCase(); const half=pt?".5":"";
   if(a==="me"&&n==="55") return ["30th-"+num.padStart(3,"0"),"30th-"+num]; const sets=n?[...new Set([a+n.padStart(2,"0")+half,a+n+half])]:[a]; const nums=[...new Set([num,num.padStart(3,"0")])]; const out=[]; for(const st of sets) for(const k of nums) out.push(st+"-"+k); return out; }
 async function tdCard(id){ const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),10000); try{ const r=await fetch(TD+"/cards/"+encodeURIComponent(id),{signal:ctl.signal}); if(r.status===404) return null; if(!r.ok) throw new Error("http"); const j=await r.json(); return j&&j.id?j:null; } finally{ clearTimeout(t); } }
@@ -388,14 +411,20 @@ async function marketFor(c){
     try{ const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?name="+encodeURIComponent(c.name||"")); const d=j.data&&j.data[0]; if(d){ const pr=(d.card_prices||[])[0]||{}, cs=(d.card_sets||[]).find(x=>c.number&&x.set_code===c.number);
         if(cs&&num(cs.set_price)){ out.rows.push(["This printing ("+cs.set_code+")",num(cs.set_price)]); out.raw=num(cs.set_price); }
         if(num(pr.tcgplayer_price)){ out.rows.push(["TCGplayer, cheapest printing",num(pr.tcgplayer_price)]); if(out.raw==null&&!c.number) out.raw=num(pr.tcgplayer_price); }
-        if(num(pr.ebay_price)) out.rows.push(["eBay, cheapest printing",num(pr.ebay_price)]); out.source="YGOPRODeck"; out.asOf="today"; if(out.raw==null) out.note="No price for this exact printing. Check the sold links."; } else out.note="No match in the price database."; }
-    catch(e){ out.note="No match in the price database. Check the sold links."; } }
-  else out.note="No market feed for this game yet. Use the sold links.";
+        if(num(pr.ebay_price)) out.rows.push(["eBay, cheapest printing",num(pr.ebay_price)]); out.source="YGOPRODeck"; out.asOf="today"; if(out.raw==null) out.note="No price for this exact printing. Check the listing links."; } else out.note="No match in the price database."; }
+    catch(e){ out.note="No match in the price database. Check the listing links."; } }
+  else if(c.tcg==="onepiece"){ const m=String(c.number||c.catalogId||"").toUpperCase().match(/^([A-Z]{2}\d{2})-\d{3}/);
+    if(S.mode==="cloud"){ out.note="Live One Piece prices load on the hosted site."; return out; }
+    if(!m) out.note="Add the card code, like OP01-001, to get a market value.";
+    else try{ const j=await opSet(m[1]), hits=j.filter(x=>x.card_set_id===m[0]); hits.forEach(x=>out.rows.push([opName(x)+(x.rarity?" ("+x.rarity+")":""),num(x.market_price)]));
+      const pick=hits.find(x=>x.card_image_id===c.catalogId)||hits.find(x=>!/_/.test(x.card_image_id||""))||hits[0]; if(pick&&num(pick.market_price)){ out.raw=num(pick.market_price); out.source="OPTCG API market"; out.asOf=pick.date_scraped||""; } else out.note="No price listed for this card."; }
+    catch(e){ out.note="Prices could not be reached. Try again in a minute."; return out; } }
+  else out.note="No market feed for this game yet. Use the listing links.";
   return MK.cache[key]=out;
 }
 function marketHtml(m){ if(!m) return `<span class="muted small">Looking up market value.</span><progress></progress>`;
   return `${m.rows.length?`<table class="mk">${m.rows.map(r=>`<tr><td>${esc(r[0])}</td><td class="n"><b>${money(r[1])}</b>${r[2]!=null&&r[3]!=null?`<div class="muted small">${money(r[2])} to ${money(r[3])}</div>`:""}</td></tr>`).join("")}</table><span class="muted small">${esc([m.source,m.asOf].filter(Boolean).join(", "))}</span>`:""}${m.note?`<span class="muted small">${esc(m.note)}</span>`:""}
-   <div class="chips">${m.links.map(([l,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`).join("")}</div><span class="muted small">Graded prices have no free live feed, so PSA and BGS open sold listings for this exact card.</span>`; }
+   <div class="chips">${m.links.map(([l,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`).join("")}</div><span class="muted small">PSA and BGS open current eBay listings for this exact card, no sign in needed.${m.links.some(l=>l[0]==="Graded price guide")?" The graded price guide shows PSA 10 and BGS 10 values on PriceCharting.":""}</span>`; }
 async function loadSheetMarket(){ const d=draft; if(!d||d.kind!=="card"||d.market||d.mkBusy) return; d.mkBusy=true; let m; try{ m=await marketFor(d.obj); }catch(e){ m={raw:null,rows:[],note:"Prices could not be reached.",links:compLinks(d.obj)}; }
   d.mkBusy=false; if(draft!==d) return; d.market=m; const c=d.obj; if(m.raw!=null&&(c.raw==null||c.rawSource==="market")){ readCardForm(); c.raw=m.raw; c.rawStatus="estimate"; c.rawSource="market"; c.rawNote=[m.source,m.asOf].filter(Boolean).join(", "); if(m.catalogId) c.catalogId=m.catalogId; drawCardSheet(); } else { const el=$("#mkt"); if(el) el.innerHTML=marketHtml(m); } }
 async function marketRefresh(){ if(MK.busy) return; const list=filtered().filter(c=>c.tcg==="naruto"||(S.mode!=="cloud"&&(c.tcg==="pokemon"||c.tcg==="yugioh"))); MK.busy=true; MK.done=0; MK.total=list.length; render(); let up=0;
@@ -619,13 +648,14 @@ function vSets(){
   ${S.liveSets[tcg]?"":`<p class="muted small" style="margin-top:14px">${S.mode==="cloud"?`Set logos and full card lists with pictures load on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>. Inside Claude you see generated badges and your own cards.`:(tcg==="pokemon"||tcg==="yugioh")?"Loading the live set list.":`Set art from <a href="${REF.artCredit.url}" target="_blank" rel="noopener">${REF.artCredit.label}</a>.`}</p>`}`;
 }
 function expandCatalog(k){ const c=REF.catalog&&REF.catalog[k]; if(!c) return null; if(c._x) return c._x; const out=[];
-  if(c.type==="op"){ for(let i=1;i<=c.count;i++){ const num=c.code+"-"+String(i).padStart(3,"0"); out.push({id:num,name:num,number:num,rarity:"",price:null,img:"https://images.scrydex.com/onepiece/"+num+"/small",big:"https://images.scrydex.com/onepiece/"+num+"/large"}); } return c._x=out; }
+  if(c.type==="op"){ for(let i=1;i<=c.count;i++){ const num=c.code+"-"+String(i).padStart(3,"0"); out.push({id:num,name:num,number:num,rarity:"",img:"https://images.scrydex.com/onepiece/"+num+"/small",big:"https://images.scrydex.com/onepiece/"+num+"/large"}); } return c._x=out; }
   const runs=c.runs||c.tiers.map(([code,v])=>[c.prefix.replace(/-$/,""),code,1,v]), ser={}; ((REF.sets[k]||{}).ladder||[]).forEach(r=>ser[r.code]=r.run); let n=0;
   for(const [pre,code,start,v] of runs){ const cnt=Array.isArray(v)?v.length:v; for(let i=0;i<cnt;i++){ n++; const num=pre+"-"+code+"-"+String(start+i).padStart(3,"0"); out.push({price:(c.prices&&c.prices[n])||null,id:num,name:Array.isArray(v)?v[i]:(/^NR/.test(pre)&&code==="HR"?"Story Flashback "+(start+i):/^NR/.test(pre)&&code==="R"?"Story Recap "+(start+i):code+" "+(start+i)),number:num,rarity:code,run:ser[code]||null,img:REF.cdn+(c.base+n)+".jpg?w=400&q=70",big:REF.cdn+(c.base+n)+".jpg?w=800&q=80"}); } }
   return c._x=out; }
-function setData(o){ if(o.catalog){ const x=expandCatalog(o.catalog); if(x) return {cards:x,meta:{}}; } return API.setCards[o.tcg+":"+(o.id||o.name)]; }
+function setData(o){ if(o.tcg==="onepiece"){ const live=API.setCards[o.tcg+":"+(o.id||o.name)]; if(live&&live.cards&&live.cards.length) return live; }
+  if(o.catalog){ const x=expandCatalog(o.catalog); if(x) return {cards:x,meta:{}}; } return API.setCards[o.tcg+":"+(o.id||o.name)]; }
 function maybeOwns(tcg,setName,cc){ const b=normSet(setName), nm=normSet(cc.name); return !!cc.rarity&&cards().some(c=>c.tcg===tcg&&normSet(c.set)===b&&!c.number&&(c.rarity||"").replace(/\s*\(.*$/,"")===cc.rarity&&(()=>{ const a=normSet(c.character||c.name); return a&&(a.includes(nm)||nm.includes(a)); })()); }
-function vSetDetail(){
+function vSetDetail(){ setTimeout(fillSetPrices,0);
   const o=S.setOpen, tcg=o.tcg, tc=tcgOf(tcg), own=cardsInSet(tcg,o.name), key=tcg+":"+(o.id||o.name), data=setData(o), lad=o.ladder&&REF.sets[o.ladder];
   const list=data&&data.cards||[], meta=data&&data.meta||{}, total=lad?lad.ladder.reduce((a,r)=>a+r.designs,0):(list.length||o.total), have=list.filter(cc=>ownsCatalog(tcg,o.name,cc)).length, shown=list.slice(0,S.setMore||60);
   const byRar=r=>own.filter(c=>(c.rarity||"").replace(/\s*\(.*$/,"")===r).reduce((a,c)=>a+(c.qty||1),0);
@@ -636,9 +666,16 @@ function vSetDetail(){
   <div class="sec">Your cards from this set</div>${own.length?`<div class="list">${own.sort((a,b)=>(b.raw||0)-(a.raw||0)).map(cardRow).join("")}</div>`:`<div class="empty">None in the vault yet.</div>`}
   <div class="sec">Full card list${list.length?", chase cards first":""}</div>
   ${data&&data.loading?`<progress></progress><p class="muted small">Loading the card list.</p>`
-   :list.length?`<div class="gallery">${shown.map((cc,i)=>{ const got=ownsCatalog(tcg,o.name,cc); const maybe=!got&&maybeOwns(tcg,o.name,cc); return `<button class="hit" style="--tc:${tc.accent}" data-act="add-setcard" data-i="${i}"><span class="art">${esc(SHORT[tcg])}${cc.img?`<img src="${esc(cc.img)}" alt="${esc(cc.name)}" loading="lazy" onerror="this.remove()">`:""}${got?`<span class="pill good own">owned</span>`:maybe?`<span class="pill warn own">could be yours</span>`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(cc.name)}</b><span class="muted small" style="display:block">${esc([cc.number===cc.name?"":(/^[A-Z]/.test(cc.number)?"":"#")+cc.number,cc.rarity&&!cc.number.includes("-"+cc.rarity+"-")?cc.rarity:"",cc.run?"numbered /"+cc.run:""].filter(Boolean).join(" · "))}</span>${cc.price?`<span class="pill" style="margin-top:5px;display:inline-block">${money(cc.price)}</span>`:""}</span></button>`; }).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="set-more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}<p class="muted small">Tap a card to see its market value or add it to your vault.${o.catalog&&tcg==="onepiece"?" One Piece cards are listed by code, with pictures from Scrydex. Alternate arts are not listed.":""}${o.catalog&&tcg!=="onepiece"?` Card pictures from <a href="${esc(o.url||REF.artCredit.url)}" target="_blank" rel="noopener">${esc(REF.artCredit.label)}</a>. "Could be yours" means you have a card with that character and rarity but no code saved yet.`:""}</p>`
+   :list.length?`<div class="gallery">${shown.map((cc,i)=>{ const got=ownsCatalog(tcg,o.name,cc); const maybe=!got&&maybeOwns(tcg,o.name,cc); return `<button class="hit" style="--tc:${tc.accent}" data-act="add-setcard" data-i="${i}"><span class="art">${esc(SHORT[tcg])}${cc.img?`<img src="${esc(cc.img)}" alt="${esc(cc.name)}" loading="lazy" onerror="this.remove()">`:""}${got?`<span class="pill good own">owned</span>`:maybe?`<span class="pill warn own">could be yours</span>`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(cc.name)}</b><span class="muted small" style="display:block">${esc([cc.number===cc.name?"":(/^[A-Z]/.test(cc.number)?"":"#")+cc.number,cc.rarity&&!cc.number.includes("-"+cc.rarity+"-")?cc.rarity:"",cc.run?"numbered /"+cc.run:""].filter(Boolean).join(" · "))}</span>${pricePill(cc,o)}</span></button>`; }).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="set-more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}<p class="muted small">Tap a card to see its market value or add it to your vault.${o.catalog&&tcg==="onepiece"?(list[0]&&list[0].name!==list[0].number?" Names, alternate arts and daily market prices from OPTCG API.":" Card names and prices load in a moment."):""}${o.catalog&&tcg!=="onepiece"?` Card pictures from <a href="${esc(o.url||REF.artCredit.url)}" target="_blank" rel="noopener">${esc(REF.artCredit.label)}</a>. "Could be yours" means you have a card with that character and rarity but no code saved yet.`:""}</p>`
    :`<div class="empty">${S.mode==="cloud"&&(tcg==="pokemon"||tcg==="yugioh")?`The full list with card pictures loads on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>.`:data&&data.err?"The card list could not be loaded right now. Try again in a minute.":o.url?`The full card list with pictures and prices is on <a href="${esc(o.url)}" target="_blank" rel="noopener">DeckTradr</a>.`:"There is no public card database with pictures for this set."}</div>`}`;
 }
+function opName(x){ return x.card_name+(/_/.test(x.card_image_id||"")&&!/\(/.test(x.card_name)?" (alt art)":""); }
+function opSet(code){ API.op=API.op||{}; if(!API.op[code]){ API.op[code]=getJSON("https://optcgapi.com/api/sets/"+code.slice(0,2)+"-"+code.slice(2)+"/").then(j=>{ if(!Array.isArray(j)||!j.length) throw new Error("empty"); return j; }); API.op[code].catch(()=>{ delete API.op[code]; }); } return API.op[code]; }
+function tdPick(d){ const tp=d&&d.pricing&&d.pricing.tcgplayer||{}, vs=Object.keys(tp).filter(k=>tp[k]&&typeof tp[k]==="object"&&tp[k].marketPrice!=null), pick=vs.includes("normal")?"normal":vs.includes("holofoil")?"holofoil":vs[0]; return pick?tp[pick].marketPrice:null; }
+function pricePill(cc,o){ return cc.price?`<span class="pill pp" style="margin-top:5px;display:inline-block">${money(cc.price)}</span>`:cc.price===null?`<span class="muted small pp" style="display:block;margin-top:5px">No price data yet</span>`:""; }
+async function fillSetPrices(){ const o=S.setOpen; if(!o||o.tcg!=="pokemon"||S.mode==="cloud"||API.ppBusy) return; const d=setData(o); if(!d||!d.cards) return; const todo=d.cards.slice(0,S.setMore||60).filter(c=>c.price===undefined); if(!todo.length) return; API.ppBusy=1; let i=0;
+  const work=async()=>{ while(i<todo.length&&S.setOpen===o){ const cc=todo[i++]; try{ cc.price=tdPick(await tdCard(cc.id)); }catch(e){ cc.price=null; } const el=document.querySelector(`.gallery [data-act="add-setcard"][data-i="${d.cards.indexOf(cc)}"] .cap`); if(el&&S.setOpen===o&&!el.querySelector(".pp")) el.insertAdjacentHTML("beforeend",pricePill(cc,o)); } };
+  await Promise.all([1,2,3,4,5,6].map(work)); API.ppBusy=0; if(S.setOpen===o) fillSetPrices(); }
 async function loadLiveSets(tcg){
   if(S.liveSets[tcg]||API.busy["s"+tcg]||S.net==="blocked") return; API.busy["s"+tcg]=1;
   try{
@@ -650,19 +687,20 @@ async function loadLiveSets(tcg){
 }
 async function loadSetCards(){
   const o=S.setOpen; if(!o||S.net==="blocked") return; const key=o.tcg+":"+(o.id||o.name); if(API.setCards[key]) return;
-  if(!((o.tcg==="pokemon"&&o.id)||o.tcg==="yugioh")) return;
-  API.setCards[key]={loading:true}; render();
+  const op=o.tcg==="onepiece"&&o.catalog&&S.mode!=="cloud"; if(!((o.tcg==="pokemon"&&o.id)||o.tcg==="yugioh"||op)) return;
+  API.setCards[key]={loading:true}; if(!op) render();
   try{ let list=[], meta={};
     if(o.tcg==="pokemon"){ const j=await getJSON(TD+"/sets/"+encodeURIComponent(o.id)); list=(j.cards||[]).map(c=>({id:c.id,name:c.name,number:c.localId,img:c.image?c.image+"/low.webp":"",big:c.image?c.image+"/high.webp":""})).reverse(); meta={when:j.releaseDate||"",era:j.serie&&j.serie.name||""}; }
+    else if(op){ const code=REF.catalog[o.catalog].code, j=await opSet(code); list=j.map(c=>({id:c.card_image_id||c.card_set_id,name:opName(c),number:c.card_set_id,rarity:c.rarity||"",price:num(c.market_price)||null,asOf:c.date_scraped||"",img:c.card_image||"https://images.scrydex.com/onepiece/"+c.card_set_id+"/small",big:c.card_image||"https://images.scrydex.com/onepiece/"+c.card_set_id+"/large"})).sort((a,b)=>(b.price||0)-(a.price||0)||a.number.localeCompare(b.number)); }
     else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?num=90&offset=0&cardset="+encodeURIComponent(o.name)); list=(j.data||[]).map(c=>{ const cs=(c.card_sets||[]).find(x=>x.set_name===o.name)||{}, im=(c.card_images||[])[0]||{}; return {id:String(c.id),name:c.name,number:cs.set_code||"",rarity:cs.set_rarity||"",price:num(cs.set_price)||null,img:im.image_url_small||"",big:im.image_url||""}; }); }
     API.setCards[key]={cards:list,meta}; netOk();
-  }catch(e){ API.setCards[key]={cards:[],err:true}; setTimeout(()=>{ delete API.setCards[key]; },20000); }
+  }catch(e){ API.setCards[key]={cards:[],err:true}; if(op) return; setTimeout(()=>{ delete API.setCards[key]; },20000); }
   if(S.view==="sets"&&!sheetOpen()) render();
 }
 async function pokeDetail(id){ try{ const d=await getJSON(TD+"/cards/"+encodeURIComponent(id)); let price=null; const tp=d.pricing&&d.pricing.tcgplayer; if(tp) for(const k of Object.keys(tp)){ const v=tp[k]; if(v&&typeof v==="object"&&v.marketPrice!=null){ price=Math.max(price||0,v.marketPrice); } } return {rarity:d.rarity||"",price,setName:d.set&&d.set.name||""}; }catch(e){ return {}; } }
 async function addCatalogCard(tcg,setName,cc,m){
   let extra={}; if(tcg==="pokemon"){ toast("Getting card details."); extra=await pokeDetail(cc.id); }
-  if(tcg==="onepiece"){ cardSheet({tcg,name:cc.name,set:setName,number:cc.number,imageUrl:cc.big||cc.img||"",catalogId:cc.id,serial:"no",source:"catalog"},true); return; }
+  if(tcg==="onepiece"){ cardSheet({tcg,name:cc.name,set:setName,number:cc.number,rarity:cc.rarity||"",imageUrl:cc.big||cc.img||"",catalogId:cc.id,serial:"no",source:"catalog",...(cc.price?{raw:cc.price,rawStatus:"estimate",rawSource:"market",rawNote:"OPTCG API market"+(cc.asOf?", "+cc.asOf:"")}:{})},true); return; }
   if(tcg==="naruto"||tcg==="kpdh"){ cardSheet({tcg,name:cc.name,character:cc.name,set:setName,number:cc.number,rarity:cc.rarity||"",imageUrl:cc.big||cc.img||"",catalogId:cc.id,serial:cc.run?"unverified":"no",serialRun:cc.run?String(cc.run):"",source:"catalog",isHit:!!cc.run,raw:cc.price||null,rawStatus:cc.price?"estimate":"unverified",rawSource:cc.price?"market":"",rawNote:cc.price?"DeckTradr market, "+((REF.kayouPrice||{}).asOf||""):""},true); return; }
   const raw=extra.price!=null?extra.price:(cc.price!=null?cc.price:null);
   cardSheet({tcg,name:cc.name,set:setName||extra.setName||"",number:cc.number||"",rarity:extra.rarity||cc.rarity||"",imageUrl:cc.big||cc.img||"",catalogId:cc.id,raw,rawStatus:raw!=null?"estimate":"unverified",serial:"no",source:"catalog"},true);
