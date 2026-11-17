@@ -188,6 +188,7 @@ nav.mainnav a.on svg{color:var(--accent)}
   nav.mainnav a{flex:0 0 auto;padding:21px 15px 19px;font-size:14.5px}
   nav.mainnav a:hover{color:var(--text)}
 }
+#sheetBox:focus{outline:none}
 </style>
 </head>
 <body>
@@ -201,7 +202,7 @@ nav.mainnav a.on svg{color:var(--accent)}
   <main id="view"></main>
 </div>
 <button class="btn pri fab" id="fab" data-act="new-card" aria-label="Add a card">+</button>
-<div id="sheet"><div class="box" id="sheetBox"></div></div>
+<div id="sheet"><div class="box" id="sheetBox" role="dialog" aria-modal="true" aria-label="Details" tabindex="-1"></div></div>
 <div id="toast" role="status"></div>
 <script src="data/reference.js"></script>
 <script src="data/rarecandy.js"></script>
@@ -241,22 +242,22 @@ function decisionPill(c){ const d=c.decision||"undecided"; if(d==="undecided") r
 
 /* ---------- storage: Claude db when hosted as an artifact, this browser otherwise ---------- */
 const LS="cardvault.v1";
-function saveLocal(){ if(S.mode!=="local") return; try{ localStorage.setItem(LS, JSON.stringify({cards:cards(),products:products(),watch:[...S.watch.values()],settings:S.settings})); }catch(e){ toast("This browser is out of storage space. Export a backup."); } }
+function saveLocal(){ if(S.mode!=="local") return true; try{ localStorage.setItem(LS, JSON.stringify({cards:cards(),products:products(),watch:[...S.watch.values()],settings:S.settings})); if(S.saveFailed){ S.saveFailed=false; try{ setSync(); }catch(_){} } return true; }catch(e){ S.saveFailed=true; try{ setSync(); }catch(_){} toast("Not saved. This browser's storage is full or blocked. Export a backup, then free up space."); return false; } }
 function loadLocal(){ try{ const d=JSON.parse(localStorage.getItem(LS)||"null"); if(d){ (d.cards||[]).forEach(c=>S.cards.set(c.id,c)); (d.products||[]).forEach(p=>S.products.set(p.id,p)); (d.watch||[]).forEach(w=>S.watch.set(w.id,w)); if(d.settings) S.settings={...S.settings,...d.settings}; } }catch(e){} }
 const mapOf = {cards:()=>S.cards, products:()=>S.products, watch:()=>S.watch};
 async function put(coll, obj){
   const {id, ...data} = obj; data.updatedAt = Date.now();
   Object.keys(data).forEach(k=>{ if(data[k]===undefined) delete data[k]; });
   if(S.mode==="cloud"){ try{ await db.doc(coll+"/"+id).set(data); }catch(e){ writeFail(e); throw e; } }
-  else { mapOf[coll]().set(id,{id,...data}); saveLocal(); render(); }
+  else { const m=mapOf[coll](), had=m.has(id), old=m.get(id); m.set(id,{id,...data}); if(!saveLocal()){ if(had) m.set(id,old); else m.delete(id); throw new Error("storage"); } render(); }
 }
 async function del(coll, id){
   if(S.mode==="cloud"){ try{ await db.doc(coll+"/"+id).delete(); }catch(e){ writeFail(e); } }
-  else { mapOf[coll]().delete(id); saveLocal(); render(); }
+  else { const m=mapOf[coll](), old=m.get(id); m.delete(id); if(!saveLocal()&&old){ m.set(id,old); } render(); }
 }
 async function saveSettings(){ if(S.mode==="cloud"){ try{ await db.doc("meta/settings").set({...S.settings}); }catch(e){ writeFail(e); } } else { saveLocal(); render(); } }
 function writeFail(e){ const c=e&&e.code; if(c==="invalid_argument"){ S.readOnly=true; toast("You can view this vault but not change it."); } else if(c==="quota_exceeded") toast("The vault is full. Remove some cards first."); else if(c==="resource_exhausted") toast("Saving too fast. Wait a moment and try again."); else toast("Could not save. Check your connection and try again."); }
-function setSync(){ const d=$("#syncDot"), t=$("#syncText"); if(S.mode==="cloud"){ d.className="dot "+(S.stale?"":"ok"); t.textContent=S.stale?"Reconnecting":"Synced"; } else if(S.mode==="local"){ d.className="dot off"; t.textContent="This device only"; } else { d.className="dot"; t.textContent="Starting up"; } }
+function setSync(){ const d=$("#syncDot"), t=$("#syncText"); if(S.mode==="cloud"){ d.className="dot "+(S.stale?"":"ok"); t.textContent=S.stale?"Reconnecting":"Synced"; } else if(S.mode==="local"){ d.className=S.saveFailed?"dot":"dot off"; t.textContent=S.saveFailed?"Not saved":"This device only"; } else { d.className="dot"; t.textContent="Starting up"; } }
 
 async function boot(){
   window.addEventListener("hashchange", route); route();
@@ -372,7 +373,7 @@ function vCollection(){
   ${S.selMode?bulkBar(list):""}
   ${list.length? `<div class="list">${shown.map(c=>cardRow(c,S.selMode)).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}`
     : `<div class="empty">${cards().length? "Nothing matches these filters." : S.mode==="starting" ? "Opening the vault." : "No cards yet. Tap Add card, scan one, or log a pull from the Rip log."}</div>`}
-  <div class="row" style="margin-top:18px"><button class="btn" data-act="mkt-refresh" ${MK.busy?"disabled":""}>${MK.busy?`Updating ${MK.done} of ${MK.total}`:"Update market values"}</button><button class="btn" data-act="export-json">Export backup</button><button class="btn" data-act="export-csv">Export CSV</button></div>`;
+  <div class="row" style="margin-top:18px"><button class="btn" data-act="mkt-refresh" ${MK.busy?"disabled":""}>${MK.busy?`Updating ${MK.done} of ${MK.total}`:"Update market values"}</button><button class="btn" data-act="export-json">Export backup</button><button class="btn" data-act="export-csv">Export CSV</button></div>${S.mkReport?`<p class="muted small" style="margin-top:8px">Last market refresh: ${esc(S.mkReport)}</p>`:""}`;
 }
 
 function bulkBar(list){ const n=S.sel.size, ps=products();
@@ -404,7 +405,7 @@ async function marketFor(c){
     try{ let d=null; for(const id of tdCandidates(c)){ d=await tdCard(id); if(d) break; }
       if(d&&d.pricing){ const tp=d.pricing.tcgplayer||{}, cm=d.pricing.cardmarket; const vs=Object.keys(tp).filter(k=>tp[k]&&typeof tp[k]==="object"&&tp[k].marketPrice!=null); const pick=vs.includes("normal")?"normal":vs.includes("holofoil")?"holofoil":vs[0];
         vs.forEach(k=>out.rows.push(["TCGplayer "+k.replace(/-/g," "),tp[k].marketPrice,tp[k].lowPrice,tp[k].highPrice])); if(pick){ out.raw=tp[pick].marketPrice; out.source="TCGplayer market"; out.asOf=String(tp.updated||"").slice(0,10); }
-        if(cm&&cm.trend!=null) out.rows.push(["Cardmarket trend (EUR)",cm.trend]); out.catalogId=d.id; if(!out.rows.length) out.note="No price listed for this card."; }
+        if(cm&&cm.trend!=null) out.rows.push(["Cardmarket trend, euros",cm.trend,null,null,"EUR"]); out.catalogId=d.id; if(!out.rows.length) out.note="No price listed for this card."; }
       else out.note = d ? "No price listed for this card." : "This card could not be matched to the price database."; }
     catch(e){ out.note="Prices could not be reached. Try again in a minute."; return out; } }
   else if(c.tcg==="yugioh"){ if(S.mode==="cloud"){ out.note="Live Yu-Gi-Oh! prices load on the hosted site."; return out; }
@@ -422,16 +423,18 @@ async function marketFor(c){
   else out.note="No market feed for this game yet. Use the listing links.";
   return MK.cache[key]=out;
 }
+function cur(n,ccy){ return ccy==="EUR" ? (n==null||isNaN(n)?"":"\u20ac"+Number(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})) : money(n); }
 function marketHtml(m){ if(!m) return `<span class="muted small">Looking up market value.</span><progress></progress>`;
-  return `${m.rows.length?`<table class="mk">${m.rows.map(r=>`<tr><td>${esc(r[0])}</td><td class="n"><b>${money(r[1])}</b>${r[2]!=null&&r[3]!=null?`<div class="muted small">${money(r[2])} to ${money(r[3])}</div>`:""}</td></tr>`).join("")}</table><span class="muted small">${esc([m.source,m.asOf].filter(Boolean).join(", "))}</span>`:""}${m.note?`<span class="muted small">${esc(m.note)}</span>`:""}
+  const ed=draft&&draft.kind==="card"&&m.raw!=null&&draft.obj.raw!=null&&draft.obj.raw!==""&&Number(draft.obj.raw)!==Number(m.raw);
+  return `${ed?`<div class="row" style="gap:8px;flex-wrap:wrap"><span class="small">Latest quote is <b>${money(m.raw)}</b>. Your saved value is ${money(draft.obj.raw)}${draft.obj.rawStatus==="verified"?", marked verified":""}.</span><button type="button" class="btn" data-act="mkt-apply">Use ${money(m.raw)}</button></div>`:""}`+`${m.rows.length?`<table class="mk">${m.rows.map(r=>`<tr><td>${esc(r[0])}</td><td class="n"><b>${cur(r[1],r[4])}</b>${r[2]!=null&&r[3]!=null?`<div class="muted small">${cur(r[2],r[4])} to ${cur(r[3],r[4])}</div>`:""}</td></tr>`).join("")}</table><span class="muted small">${esc([m.source,m.asOf].filter(Boolean).join(", "))}</span>`:""}${m.note?`<span class="muted small">${esc(m.note)}</span>`:""}
    <div class="chips">${m.links.map(([l,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`).join("")}</div><span class="muted small">PSA and BGS open current eBay listings for this exact card, no sign in needed.${m.links.some(l=>l[0]==="Graded price guide")?" The graded price guide shows PSA 10 and BGS 10 values on PriceCharting.":""}</span>`; }
 async function loadSheetMarket(){ const d=draft; if(!d||d.kind!=="card"||d.market||d.mkBusy) return; d.mkBusy=true; let m; try{ m=await marketFor(d.obj); }catch(e){ m={raw:null,rows:[],note:"Prices could not be reached.",links:compLinks(d.obj)}; }
-  d.mkBusy=false; if(draft!==d) return; d.market=m; const c=d.obj; if(m.raw!=null&&(c.raw==null||c.rawSource==="market")){ readCardForm(); c.raw=m.raw; c.rawStatus="estimate"; c.rawSource="market"; c.rawNote=[m.source,m.asOf].filter(Boolean).join(", "); if(m.catalogId) c.catalogId=m.catalogId; drawCardSheet(); } else { const el=$("#mkt"); if(el) el.innerHTML=marketHtml(m); } }
-async function marketRefresh(){ if(MK.busy) return; const list=filtered().filter(c=>c.tcg==="naruto"||(S.mode!=="cloud"&&(c.tcg==="pokemon"||c.tcg==="yugioh"))); MK.busy=true; MK.done=0; MK.total=list.length; render(); let up=0;
-  for(const c of list){ try{ const m=await marketFor(c); if(m.raw!=null&&(c.raw==null||c.rawStatus!=="verified")&&(c.raw!==m.raw||c.rawSource!=="market")){ const next={...c,raw:m.raw,rawStatus:"estimate",rawSource:"market",rawNote:[m.source,m.asOf].filter(Boolean).join(", ")}; if(m.catalogId) next.catalogId=m.catalogId;
-        if(S.mode==="local"){ S.cards.set(c.id,next); } else { const {id,...data}=next; data.updatedAt=Date.now(); await db.doc("cards/"+id).set(data); } up++; } }catch(e){}
+  d.mkBusy=false; if(draft!==d) return; d.market=m; const c=d.obj; readCardForm(); if(m.raw!=null&&(c.raw==null||c.raw==="")&&c.rawStatus!=="verified"){ c.raw=m.raw; c.rawStatus="estimate"; c.rawSource="market"; c.rawNote=[m.source,m.asOf].filter(Boolean).join(", "); if(m.catalogId) c.catalogId=m.catalogId; drawCardSheet(); } else { const el=$("#mkt"); if(el) el.innerHTML=marketHtml(m); } }
+async function marketRefresh(){ if(MK.busy) return; const live=S.mode!=="cloud", all=filtered(), list=all.filter(c=>c.tcg==="naruto"||c.tcg==="kpdh"||(live&&(c.tcg==="pokemon"||c.tcg==="yugioh"||c.tcg==="onepiece"))); MK.cache={}; API.op={}; MK.busy=true; MK.done=0; MK.total=list.length; render(); let up=0, same=0, none=0, fail=0, kept=0;
+  for(const c of list){ try{ const m=await marketFor(c); if(m.raw==null){ if(/could not be reached/.test(m.note||"")) fail++; else none++; } else if(c.rawStatus==="verified"&&c.raw!=null) kept++; else if(c.raw===m.raw&&c.rawSource==="market") same++; else { const next={...c,raw:m.raw,rawStatus:"estimate",rawSource:"market",rawNote:[m.source,m.asOf].filter(Boolean).join(", ")}; if(m.catalogId) next.catalogId=m.catalogId;
+        if(S.mode==="local"){ S.cards.set(c.id,next); } else { const {id,...data}=next; data.updatedAt=Date.now(); await db.doc("cards/"+id).set(data); } up++; } }catch(e){ fail++; }
     MK.done++; if(MK.done%6===0){ const b=document.querySelector("[data-act=mkt-refresh]"); if(b) b.textContent=`Updating ${MK.done} of ${MK.total}`; } }
-  if(S.mode==="local") saveLocal(); MK.busy=false; toast(`${up} card${up===1?"":"s"} updated with market values. Values you marked verified were left alone.`); render(); }
+  const saved=S.mode!=="local"||saveLocal(); MK.busy=false; const skip=all.length-list.length; S.mkReport=[`${up} updated`,`${same} unchanged`,none?`${none} with no price available`:"",fail?`${fail} failed to load`:"",kept?`${kept} verified values left alone`:"",skip?`${skip} skipped (no price feed${live?"":" inside Claude"})`:""].filter(Boolean).join(", ")+"."; if(saved) toast("Market refresh: "+S.mkReport); render(); }
 function viewSheet(tcg,setName,cc){ const c={tcg,name:cc.name,set:setName,number:cc.number,rarity:cc.rarity||"",catalogId:cc.id}, rule=serialRule(c); draft={kind:"view",tcg,setName,cc};
   openSheet(`<div class="stack"><div class="row"><h2 style="margin:0" class="grow">${esc(cc.name)}</h2><button type="button" class="btn ghost" data-act="close">Close</button></div>
    <div class="row" style="align-items:flex-start">${cc.big||cc.img?`<img class="preview big" src="${esc(cc.big||cc.img)}" alt="${esc(cc.name)}" onerror="this.remove()">`:""}<div class="grow stack"><div class="muted">${esc([tcgOf(tcg).label,setName].join(" · "))}</div><div class="pills">${cc.number?`<span class="pill">${esc(cc.number)}</span>`:""}${cc.rarity?`<span class="pill">${esc(cc.rarity)}</span>`:""}${rule.mode==="always"?`<span class="pill acc">numbered /${rule.run}</span>`:rule.mode==="never"?`<span class="pill">not numbered</span>`:""}${ownsCatalog(tcg,setName,cc)?`<span class="pill good">owned</span>`:""}</div>
@@ -574,11 +577,19 @@ async function sheetAdd(){
   sh.busy=false; sh.msg=`Added ${added} new card${added===1?"":"s"}${bumped?` and one more copy of ${bumped} you already had`:""}.`; if(sh.cells.every(c=>!c.on)) sh.cells=null; render();
 }
 async function restoreBackup(file){
-  if(!file) return; let d; try{ d=JSON.parse(await file.text()); }catch(e){ toast("That file is not a vault backup."); return; }
-  const groups=[["cards",d.cards],["products",d.products],["watch",d.watch]].filter(g=>Array.isArray(g[1])); if(!groups.length){ toast("That file is not a vault backup."); return; }
-  S.imp.busy=true; S.imp.done=0; S.imp.total=groups.reduce((a,g)=>a+g[1].length,0); S.imp.msg="Restoring."; render(); let ok=0;
-  for(const [coll,arr] of groups){ for(const o of arr){ if(o&&o.id){ if(S.mode==="local"){ mapOf[coll]().set(o.id,o); ok++; } else { const {id,...data}=o; try{ await db.doc(coll+"/"+id).set(data); ok++; }catch(e){ if(e&&e.code==="resource_exhausted") await new Promise(z=>setTimeout(z,2500)); } } } S.imp.done++; } }
-  if(S.mode==="local") saveLocal(); S.imp.busy=false; S.imp.msg=`Restored ${ok} items from the backup.`; render();
+  if(!file) return; let d; try{ d=JSON.parse(await file.text()); }catch(e){ toast("That file is not a vault backup. Nothing was changed."); return; }
+  const okItem=o=>o&&typeof o==="object"&&!Array.isArray(o)&&typeof o.id==="string"&&o.id.length>0&&o.id.length<200&&!/[\/\s]/.test(o.id);
+  const groups=d&&typeof d==="object"?[["cards",d.cards],["products",d.products],["watch",d.watch]].filter(g=>Array.isArray(g[1])):[]; if(!groups.length){ toast("That file is not a vault backup. Nothing was changed."); return; }
+  const skipped=groups.reduce((a,g)=>a+g[1].filter(o=>!okItem(o)).length,0); groups.forEach(g=>g[1]=g[1].filter(okItem));
+  const st=d.settings&&typeof d.settings==="object"&&!Array.isArray(d.settings)?d.settings:null;
+  S.imp.busy=true; S.imp.done=0; S.imp.total=groups.reduce((a,g)=>a+g[1].length,0); S.imp.msg="Restoring."; render(); let ok=0, failed=0;
+  if(S.mode==="local"){ const snap={cards:new Map(S.cards),products:new Map(S.products),watch:new Map(S.watch),settings:S.settings};
+    for(const [coll,arr] of groups) for(const o of arr){ mapOf[coll]().set(o.id,o); ok++; }
+    if(st) S.settings={...S.settings,...st,owners:[...new Set([...(S.settings.owners||[]),...(Array.isArray(st.owners)?st.owners.filter(x=>typeof x==="string"):[])])]};
+    if(!saveLocal()){ S.cards=snap.cards; S.products=snap.products; S.watch=snap.watch; S.settings=snap.settings; S.imp.busy=false; S.imp.msg="Restore failed because this browser could not store the data. Your vault was left as it was."; render(); return; } }
+  else { for(const [coll,arr] of groups){ for(const o of arr){ const {id,...data}=o; try{ await db.doc(coll+"/"+id).set(data); ok++; }catch(e){ failed++; if(e&&e.code==="resource_exhausted") await new Promise(z=>setTimeout(z,2500)); } S.imp.done++; } }
+    if(st){ S.settings={...S.settings,...st,owners:[...new Set([...(S.settings.owners||[]),...(Array.isArray(st.owners)?st.owners.filter(x=>typeof x==="string"):[])])]}; await saveSettings(); } }
+  S.imp.busy=false; S.imp.msg=`Restored ${ok} items${st?" and your settings":""} from the backup.${failed?` ${failed} could not be written.`:""}${skipped?` ${skipped} damaged entries were skipped.`:""} Photos stored on another device do not travel with a backup.`; render();
 }
 function findImport(){
   const im=S.imp;
@@ -668,7 +679,7 @@ function vSetDetail(){ setTimeout(fillSetPrices,0);
     <div class="pills"><span class="pill acc">${own.reduce((a,c)=>a+(c.qty||1),0)} in your vault</span>${list.length?`<span class="pill">${have} of ${list.length} collected</span>`:""}</div>${list.length?`<progress value="${have}" max="${list.length}" style="margin-top:10px"></progress>`:""}</div></div>
   ${lad?`<div class="sec">Rarity ladder</div><div class="scroll panel" style="padding:4px 6px"><table><tr><th>Code</th><th>Name</th><th class="n">Designs</th><th class="n">Numbered to</th><th class="n">You have</th></tr>${lad.ladder.map(r=>`<tr><td><b>${esc(r.code)}</b></td><td>${esc(r.name)}<div class="muted small">${esc(r.theme)}</div></td><td class="n">${r.designs}</td><td class="n">${r.run?`<span class="pill acc" style="--tc:var(--accent)">/${r.run}</span>`:`<span class="muted">no</span>`}</td><td class="n">${byRar(r.code)||`<span class="muted">0</span>`}</td></tr>`).join("")}</table></div>`:""}
   <div class="sec">Your cards from this set</div>${own.length?`<div class="list">${own.sort((a,b)=>(b.raw||0)-(a.raw||0)).map(cardRow).join("")}</div>`:`<div class="empty">None in the vault yet.</div>`}
-  <div class="sec">Full card list${list.length?", chase cards first":""}</div>
+  <div class="sec">Full card list${!list.length?"":tcg==="pokemon"?", highest card numbers first":tcg==="yugioh"?"":", chase cards first"}</div>
   ${data&&data.loading?`<progress></progress><p class="muted small">Loading the card list.</p>`
    :list.length?`<div class="gallery">${shown.map((cc,i)=>{ const got=ownsCatalog(tcg,o.name,cc); const maybe=!got&&maybeOwns(tcg,o.name,cc); return `<button class="hit" style="--tc:${tc.accent}" data-act="add-setcard" data-i="${i}"><span class="art">${esc(SHORT[tcg])}${cc.img?`<img src="${esc(cc.img)}" alt="${esc(cc.name)}" loading="lazy" onerror="this.remove()">`:""}${got?`<span class="pill good own">owned</span>`:maybe?`<span class="pill warn own">could be yours</span>`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(cc.name)}</b><span class="muted small" style="display:block">${esc([cc.number===cc.name?"":(/^[A-Z]/.test(cc.number)?"":"#")+cc.number,cc.rarity&&!cc.number.includes("-"+cc.rarity+"-")?cc.rarity:"",cc.run?"numbered /"+cc.run:""].filter(Boolean).join(" · "))}</span>${pricePill(cc,o)}</span></button>`; }).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="set-more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}<p class="muted small">Tap a card to see its market value or add it to your vault.${o.catalog&&tcg==="onepiece"?(list[0]&&list[0].name!==list[0].number?" Names, alternate arts and daily market prices from OPTCG API.":" Card names and prices load in a moment."):""}${o.catalog&&tcg!=="onepiece"?` Card pictures from <a href="${esc(o.url||REF.artCredit.url)}" target="_blank" rel="noopener">${esc(REF.artCredit.label)}</a>. "Could be yours" means you have a card with that character and rarity but no code saved yet.`:""}</p>`
    :`<div class="empty">${S.mode==="cloud"&&(tcg==="pokemon"||tcg==="yugioh")?`The full list with card pictures loads on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>.`:data&&data.err?"The card list could not be loaded right now. Try again in a minute.":o.url?`The full card list with pictures and prices is on <a href="${esc(o.url)}" target="_blank" rel="noopener">DeckTradr</a>.`:"There is no public card database with pictures for this set."}</div>`}`;
@@ -727,9 +738,13 @@ function vSerials(){
 
 /* ---------- sheets ---------- */
 let draft=null, pendingPhoto=null;
-function openSheet(html){ $("#sheetBox").innerHTML=html; $("#sheet").classList.add("open"); }
-function closeSheetQuiet(){ $("#sheet").classList.remove("open"); draft=null; pendingPhoto=null; }
-function closeSheet(){ $("#sheet").classList.remove("open"); draft=null; pendingPhoto=null; S.dirty=false; render(); }
+let sheetBack=null;
+function sheetInert(on){ document.querySelectorAll(".app,.topbar,#fab").forEach(e=>{ if(on) e.setAttribute("inert",""); else e.removeAttribute("inert"); }); }
+function openSheet(html){ const box=$("#sheetBox"), was=sheetOpen(), act=document.activeElement, keep=was&&act&&box.contains(act)&&act.id?act.id:null; if(!was) sheetBack=act&&act!==document.body?{id:act.id,act:act.dataset&&act.dataset.act,v:act.dataset&&act.dataset.v,i:act.dataset&&act.dataset.id}:null;
+  box.innerHTML=html; $("#sheet").classList.add("open"); sheetInert(true); const h=box.querySelector("h2"); box.setAttribute("aria-label",h?h.textContent.trim():"Details"); if(!was) box.focus({preventScroll:true}); else if(keep){ const e=document.getElementById(keep); if(e) e.focus({preventScroll:true}); } }
+function sheetReturn(){ sheetInert(false); const b=sheetBack; sheetBack=null; if(!b) return; setTimeout(()=>{ let e=b.id&&document.getElementById(b.id); if(!e&&b.act) e=[...document.querySelectorAll(`[data-act="${b.act}"]`)].find(x=>(b.i==null||x.dataset.id===b.i)&&(b.v==null||x.dataset.v===b.v)); if(e&&e.focus) e.focus({preventScroll:true}); },0); }
+function closeSheetQuiet(){ $("#sheet").classList.remove("open"); draft=null; pendingPhoto=null; sheetReturn(); }
+function closeSheet(){ $("#sheet").classList.remove("open"); draft=null; pendingPhoto=null; S.dirty=false; render(); sheetReturn(); }
 function seg(name,opts,val){ return `<div class="seg" data-seg="${name}">${opts.map(([v,l])=>`<button type="button" class="${val===v?"on":""}" data-act="seg" data-name="${name}" data-v="${v}">${l}</button>`).join("")}</div>`; }
 function cardSheet(c, isNew){
   draft={kind:"card",isNew,obj:{qty:1,serial:"unverified",rawStatus:"unverified",bgsStatus:"unverified",decision:"undecided",reasons:[],tcg:S.f.tcg!=="all"?S.f.tcg:"naruto",owner:S.f.owner!=="all"?S.f.owner:S.settings.owners[0],...c}};
@@ -919,6 +934,7 @@ document.addEventListener("click", async e=>{
   else if(a==="sel-none"){ S.sel=new Set(); render(); }
   else if(a==="bulk"){ const k=b.dataset.k, on=b.dataset.v==="1"; bulkApply({[k]:on}, k==="isHit"?(on?"Added to hits":"Removed from hits"):(on?"Marked top loaded":"Marked not top loaded")); }
   else if(a==="mkt-refresh") marketRefresh();
+  else if(a==="mkt-apply"){ const d=draft, m=d&&d.market; if(d&&d.kind==="card"&&m&&m.raw!=null){ readCardForm(); const c=d.obj; c.raw=m.raw; c.rawStatus="estimate"; c.rawSource="market"; c.rawNote=[m.source,m.asOf].filter(Boolean).join(", "); if(m.catalogId) c.catalogId=m.catalogId; drawCardSheet(); } }
   else if(a==="view-add"){ const d=draft; if(d&&d.kind==="view"){ const m=d.market; closeSheetQuiet(); addCatalogCard(d.tcg,d.setName,d.cc,m); } }
   else if(a==="edit-card"){ const c=S.cards.get(id); if(c) cardSheet({...c,reasons:[...(c.reasons||[])]},false); }
   else if(a==="close") closeSheet();
@@ -978,7 +994,8 @@ document.addEventListener("change", e=>{ const t=e.target;
   else if(t.id==="stcg"){ S.search.tcg=t.value; S.search.results=null; S.search.note=""; S.search.q=$("#sq").value; render(); }
 });
 let qt; document.addEventListener("input", e=>{ if(e.target.id==="q"){ S.f.q=e.target.value; clearTimeout(qt); qt=setTimeout(()=>{ S.more=60; render(); const el=$("#q"); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } },250); } });
-document.addEventListener("keydown", e=>{ if(e.key==="Enter"&&e.target.id==="sq"){ e.preventDefault(); doSearch(); } if(e.key==="Escape"&&sheetOpen()) closeSheet(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Enter"&&e.target.id==="sq"){ e.preventDefault(); doSearch(); } if(e.key==="Escape"&&sheetOpen()) closeSheet();
+  if(e.key==="Tab"&&sheetOpen()){ const box=$("#sheetBox"), f=[...box.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x=>x.offsetParent!==null); if(!f.length){ e.preventDefault(); return; } const a=document.activeElement, first=f[0], last=f[f.length-1]; if(!box.contains(a)||(e.shiftKey&&(a===first||a===box))){ e.preventDefault(); last.focus(); } else if(!e.shiftKey&&a===last){ e.preventDefault(); first.focus(); } } });
 let rz; addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(drawFoil,150); });
 
 async function seedNaruto(){
