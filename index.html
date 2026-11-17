@@ -342,7 +342,7 @@ function filtered(){
 }
 function filterBar(){
   const used = new Set(cards().map(c=>c.tcg));
-  const t = [["all","All games"], ...REF.tcgs.filter(t=>used.has(t.id)||["naruto","pokemon","yugioh","kpdh"].includes(t.id)).map(t=>[t.id,t.label])];
+  const t = [["all","All games"], ...REF.tcgs.filter(t=>used.has(t.id)||["naruto","pokemon","yugioh","kpdh","onepiece"].includes(t.id)).map(t=>[t.id,t.label])];
   const o = [["all","Everyone"], ...S.settings.owners.map(n=>[n,n])];
   return `<div class="stack" style="gap:8px">
     <div class="chips scrollx">${t.map(([id,l])=>`<button class="chip ${S.f.tcg===id?"on":""}" data-act="f-tcg" data-v="${id}">${esc(l)}</button>`).join("")}</div>
@@ -378,7 +378,7 @@ function vCollection(){
   <div class="row" style="margin:14px 0 10px"><input type="search" id="q" placeholder="Filter this list by name, set, number" value="${esc(S.f.q)}" class="grow">
     <button class="btn ${S.selMode?"pri":""}" data-act="sel-mode">${S.selMode?"Done":"Select"}</button>
     <select id="fDecision" style="width:auto"><option value="all">Any decision</option>${["undecided","keep","trade","sell"].map(d=>`<option ${S.f.decision===d?"selected":""}>${d}</option>`).join("")}</select></div>
-  ${RC&&S.mode!=="starting"&&!S.readOnly&&(RCS.busy||RCS.msg||rcPending().length===RC.rows.length)?`<div class="panel stack" style="margin-bottom:12px;border-color:var(--accent)"><b>Your Rare Candy library is ready</b><span class="muted">${RC.rows.length} Pokémon cards read from the Pilot007 profile on ${esc(RC.asOf)}.</span>${rcButton()}</div>`:""}
+  ${RC&&S.mode!=="starting"&&!S.readOnly&&(S.f.tcg==="all"||S.f.tcg==="pokemon")&&(RCS.busy||RCS.msg||rcPending().length===RC.rows.length)?`<div class="panel stack" style="margin-bottom:12px;border-color:var(--accent)"><b>Your Rare Candy library is ready</b><span class="muted">${RC.rows.length} Pokémon cards read from the Pilot007 profile on ${esc(RC.asOf)}.</span>${rcButton()}</div>`:""}
   ${S.selMode?bulkBar(list):""}
   ${list.length? `<div class="list">${shown.map(c=>cardRow(c,S.selMode)).join("")}</div>${list.length>shown.length?`<p><button class="btn" data-act="more">Show ${Math.min(60,list.length-shown.length)} more of ${list.length}</button></p>`:""}`
     : `<div class="empty">${cards().length? "Nothing matches these filters." : S.mode==="starting" ? "Opening the vault." : "No cards yet. Tap Add card, scan one, or log a pull from the Rip log."}</div>`}
@@ -394,7 +394,7 @@ function bulkBar(list){ const n=S.sel.size, ps=products();
    ${S.bulkMsg?`<div class="note">${esc(S.bulkMsg)}</div>`:""}</div>`; }
 async function bulkApply(patch,label){ const ids=[...S.sel]; if(!ids.length) return; S.bulkMsg=`Updating ${ids.length} cards.`; render(); let ok=0;
   for(const id of ids){ const c=S.cards.get(id); if(!c) continue; const next={...c,...patch}; if(next.decision!=="keep") next.reasons=[]; if(S.mode==="local"){ next.updatedAt=Date.now(); S.cards.set(id,next); ok++; } else { const {id:_,...data}=next; data.updatedAt=Date.now(); try{ await db.doc("cards/"+id).set(data); ok++; }catch(e){ if(e&&e.code==="resource_exhausted") await new Promise(z=>setTimeout(z,2500)); else if(e&&e.code==="invalid_argument"){ writeFail(e); break; } } } }
-  if(S.mode==="local") saveLocal(); S.bulkMsg=`${label}: ${ok} card${ok===1?"":"s"} updated.`; render(); }
+  if(S.mode==="local"&&!saveLocal()){ S.bulkMsg="Not saved. This browser's storage is full or blocked. The change will be lost when you close the page."; render(); return; } S.bulkMsg=`${label}: ${ok} card${ok===1?"":"s"} updated.`; render(); }
 
 /* ---------- market values ---------- */
 const MK={busy:false,done:0,total:0,cache:{}};
@@ -409,11 +409,12 @@ async function marketFor(c){ const out=await marketCore(c); if(!out._g){ out._g=
 async function marketCore(c){
   const key=c.tcg+"|"+(c.catalogId||c.id||"")+"|"+(c.number||"")+"|"+(c.name||"")+"|"+(c.finish||""); if(MK.cache[key]) return MK.cache[key];
   const out={raw:null,rows:[],source:"",asOf:"",note:"",links:compLinks(c)};
-  if(c.tcg==="naruto"||c.tcg==="kpdh"){ const kp=REF.kayouPrice||{}, cat={priceSource:kp.source,priceAsOf:kp.asOf,priceUrl:REF.artCredit.url}, list=Object.keys(REF.catalog||{}).filter(k=>REF.catalog[k].type!=="op").flatMap(k=>expandCatalog(k)||[]), nc=v=>String(v||"").toLowerCase().replace(/\u25c7/g,"d").replace(/[^a-z0-9]/g,""), hit=c.number&&list.find(x=>nc(x.number)===nc(String(c.number).replace(/L\d$/i,"")));
+  if(c.tcg==="naruto"||c.tcg==="kpdh"){ const kp=REF.kayouPrice||{}, cat={priceSource:kp.source,priceAsOf:kp.asOf,priceUrl:REF.artCredit.url}, list=Object.keys(REF.catalog||{}).filter(k=>REF.catalog[k].type!=="op").flatMap(k=>expandCatalog(k)||[]), nc=v=>String(v||"").toLowerCase().replace(/\u25c7/g,"d").replace(/[^a-z0-9]/g,""), hit=c.number&&list.find(x=>nc(x.number)===nc(String(c.number).replace(/L\d{1,2}$/i,"")));
     if(hit&&hit.price){ out.raw=hit.price; out.rows=[["Market, near mint",hit.price]]; out.source=cat.priceSource; out.asOf=cat.priceAsOf; out.links.unshift(["DeckTradr",cat.priceUrl]); }
     else out.note = hit ? "No recent sales recorded for this card yet." : c.number ? "No market data for this card code." : "Add the card code to get a market value."; }
   else if(c.tcg==="pokemon"){ if(S.mode==="cloud"){ out.note="Live Pokémon prices load on the hosted site."; return out; }
-    try{ let d=null; for(const id of tdCandidates(c)){ d=await tdCard(id); if(d) break; }
+    try{ let d=null, ids=tdCandidates(c); if(!ids.length&&c.set&&c.number){ if(!S.liveSets.pokemon) await loadLiveSets("pokemon"); const so=(S.liveSets.pokemon||[]).find(x=>normSet(x.name)===normSet(c.set)), n=String(c.number).split("/")[0].trim(); if(so&&n) ids=[...new Set([so.id+"-"+n,so.id+"-"+n.padStart(3,"0"),so.id+"-"+n.replace(/^0+(?=.)/,"")])]; }
+      for(const id of ids){ d=await tdCard(id); if(d) break; } if(d&&d.image) out.image=d.image+"/high.webp"; if(d&&d.rarity) out.rarity=d.rarity;
       if(d&&d.pricing){ const tp=d.pricing.tcgplayer||{}, cm=d.pricing.cardmarket; const vs=Object.keys(tp).filter(k=>tp[k]&&typeof tp[k]==="object"&&tp[k].marketPrice!=null); const want=c.finish&&vs.includes(c.finish)?c.finish:"", pick=want||(vs.includes("normal")?"normal":vs.includes("holofoil")?"holofoil":vs[0]); if(c.finish&&!want&&pick) out.note="No price for the "+lab(FIN.pokemon,c.finish)+" finish. Showing "+pick.replace(/-/g," ")+"."; else if(!c.finish&&vs.length>1) out.note="This card has "+vs.length+" finishes with different prices. Pick yours under This copy.";
         vs.forEach(k=>out.rows.push(["TCGplayer "+k.replace(/-/g," "),tp[k].marketPrice,tp[k].lowPrice,tp[k].highPrice])); if(pick){ out.raw=tp[pick].marketPrice; out.source="TCGplayer market"; out.asOf=String(tp.updated||"").slice(0,10); }
         if(cm&&cm.trend!=null) out.rows.push(["Cardmarket trend, euros",cm.trend,null,null,"EUR"]); out.catalogId=d.id; if(!out.rows.length) out.note="No price listed for this card."; if(pick) out.finish=pick; }
@@ -441,12 +442,12 @@ function marketHtml(m){ if(!m) return `<span class="muted small">Looking up mark
    <div class="chips">${m.links.map(([l,u])=>`<a class="chip" href="${esc(u)}" target="_blank" rel="noopener">${esc(l)}</a>`).join("")}</div><span class="muted small">PSA and BGS open current eBay listings for this exact card, no sign in needed.${m.links.some(l=>l[0]==="Graded price guide")?" The graded price guide shows PSA 10 and BGS 10 values on PriceCharting.":""}</span>`; }
 async function loadSheetMarket(){ const d=draft; if(!d||d.kind!=="card"||d.market||d.mkBusy) return; d.mkBusy=true; let m; try{ m=await marketFor(d.obj); }catch(e){ m={raw:null,rows:[],note:"Prices could not be reached.",links:compLinks(d.obj)}; }
   d.mkBusy=false; if(draft!==d) return; d.market=m; const c=d.obj; readCardForm(); if(m.bgs!=null&&(c.bgs==null||c.bgs==="")&&c.bgsStatus!=="verified"){ c.bgs=m.bgs; c.bgsStatus="estimate"; c.bgsSource="market"; c.bgsNote=m.bgsNote||""; d.bgsFilled=true; }
-  let fill=!!d.bgsFilled; d.bgsFilled=false; if(m.raw!=null&&(c.raw==null||c.raw==="")&&c.rawStatus!=="verified"){ c.raw=m.raw; c.rawStatus="estimate"; c.rawSource="market"; c.rawNote=[m.source,m.asOf].filter(Boolean).join(", "); if(m.catalogId) c.catalogId=m.catalogId; fill=true; } if(fill) drawCardSheet(); else { const el=$("#mkt"); if(el) el.innerHTML=marketHtml(m); } }
+  let fill=!!d.bgsFilled; d.bgsFilled=false; if(m.image&&!c.imageUrl&&!c.photo&&!c.photoId){ c.imageUrl=m.image; fill=true; } if(m.rarity&&!c.rarity){ c.rarity=m.rarity; fill=true; } if(m.catalogId&&!c.catalogId) c.catalogId=m.catalogId; if(m.raw!=null&&(c.raw==null||c.raw==="")&&c.rawStatus!=="verified"){ c.raw=m.raw; c.rawStatus="estimate"; c.rawSource="market"; c.rawNote=[m.source,m.asOf].filter(Boolean).join(", "); if(m.catalogId) c.catalogId=m.catalogId; fill=true; } if(fill) drawCardSheet(); else { const el=$("#mkt"); if(el) el.innerHTML=marketHtml(m); } }
 async function marketRefresh(){ if(MK.busy) return; const live=S.mode!=="cloud", all=filtered(), list=all.filter(c=>c.tcg==="naruto"||c.tcg==="kpdh"||(live&&(c.tcg==="pokemon"||c.tcg==="yugioh"||c.tcg==="onepiece"))); MK.cache={}; API.op={}; MK.busy=true; MK.done=0; MK.total=list.length; render(); let up=0, same=0, none=0, fail=0, kept=0, graded=0;
-  for(let c of list){ try{ const m=await marketFor(c); if(m.bgs!=null&&c.bgsStatus!=="verified"&&c.bgs!==m.bgs&&(c.bgs==null||c.bgsSource==="market")){ const nb={...c,bgs:m.bgs,bgsStatus:"estimate",bgsSource:"market",bgsNote:m.bgsNote||""}; if(S.mode==="local") S.cards.set(c.id,nb); else { const {id,...data}=nb; data.updatedAt=Date.now(); await db.doc("cards/"+id).set(data); } c=nb; graded++; } if(m.raw==null){ if(/could not be reached/.test(m.note||"")) fail++; else none++; } else if(c.rawStatus==="verified"&&c.raw!=null) kept++; else if(c.raw===m.raw&&c.rawSource==="market") same++; else { const next={...c,raw:m.raw,rawStatus:"estimate",rawSource:"market",rawNote:[m.source,m.asOf].filter(Boolean).join(", ")}; if(m.catalogId) next.catalogId=m.catalogId;
+  for(let c of list){ try{ const m=await marketFor(c); if(m.bgs!=null&&c.bgsStatus!=="verified"&&c.bgs!==m.bgs&&(c.bgs==null||c.bgsSource==="market")){ const nb={...c,bgs:m.bgs,bgsStatus:"estimate",bgsSource:"market",bgsNote:m.bgsNote||""}; if(S.mode==="local") S.cards.set(c.id,nb); else { const {id,...data}=nb; data.updatedAt=Date.now(); await db.doc("cards/"+id).set(data); } c=nb; graded++; } if(m.raw==null){ if(/could not be reached/.test(m.note||"")) fail++; else none++; } else if((c.rawStatus==="verified"||c.rawSource==="mine")&&c.raw!=null) kept++; else if(c.raw===m.raw&&c.rawSource==="market") same++; else { const next={...c,raw:m.raw,rawStatus:"estimate",rawSource:"market",rawNote:[m.source,m.asOf].filter(Boolean).join(", ")}; if(m.catalogId) next.catalogId=m.catalogId;
         if(S.mode==="local"){ S.cards.set(c.id,next); } else { const {id,...data}=next; data.updatedAt=Date.now(); await db.doc("cards/"+id).set(data); } up++; } }catch(e){ fail++; }
     MK.done++; if(MK.done%6===0){ const b=document.querySelector("[data-act=mkt-refresh]"); if(b) b.textContent=`Updating ${MK.done} of ${MK.total}`; } }
-  const saved=S.mode!=="local"||saveLocal(); MK.busy=false; const skip=all.length-list.length; S.mkReport=[`${up} updated`,`${same} unchanged`,graded?`${graded} Beckett 10 values filled from sold listings`:"",none?`${none} with no price available`:"",fail?`${fail} failed to load`:"",kept?`${kept} verified values left alone`:"",skip?`${skip} skipped (no price feed${live?"":" inside Claude"})`:""].filter(Boolean).join(", ")+"."; if(saved) toast("Market refresh: "+S.mkReport); render(); }
+  const saved=S.mode!=="local"||saveLocal(); MK.busy=false; const skip=all.length-list.length; S.mkReport=[`${up} updated`,`${same} unchanged`,graded?`${graded} Beckett 10 values filled from sold listings`:"",none?`${none} with no price available`:"",fail?`${fail} failed to load`:"",kept?`${kept} verified or hand-entered values left alone`:"",skip?`${skip} skipped (no price feed${live?"":" inside Claude"})`:""].filter(Boolean).join(", ")+"."; if(saved) toast("Market refresh: "+S.mkReport); render(); }
 function viewSheet(tcg,setName,cc){ const c={tcg,name:cc.name,set:setName,number:cc.number,rarity:cc.rarity||"",catalogId:cc.id}, rule=serialRule(c); draft={kind:"view",tcg,setName,cc};
   openSheet(`<div class="stack"><div class="row"><h2 style="margin:0" class="grow">${esc(cc.name)}</h2><button type="button" class="btn ghost" data-act="close">Close</button></div>
    <div class="row" style="align-items:flex-start">${cc.big||cc.img?`<img class="preview big" src="${esc(cc.big||cc.img)}" alt="${esc(cc.name)}" onerror="this.remove()">`:""}<div class="grow stack"><div class="muted">${esc([tcgOf(tcg).label,setName].join(" · "))}</div><div class="pills">${cc.number?`<span class="pill">${esc(cc.number)}</span>`:""}${cc.rarity?`<span class="pill">${esc(cc.rarity)}</span>`:""}${rule.mode==="always"?`<span class="pill acc">numbered /${rule.run}</span>`:rule.mode==="never"?`<span class="pill">not numbered</span>`:""}${ownsCatalog(tcg,setName,cc)?`<span class="pill good">owned</span>`:""}</div>
@@ -477,7 +478,7 @@ function vRips(){
       <div class="row" style="margin-top:10px"><button class="btn pri" data-act="pull" data-id="${p.id}">Log a pull</button><label class="btn pri" for="ps_${p.id}">Scan a pull</label><input type="file" class="pullScan" id="ps_${p.id}" data-id="${p.id}" accept="image/*" hidden><button class="btn" data-act="pack-plus" data-id="${p.id}">Pack opened +1</button><button class="btn ghost" data-act="edit-product" data-id="${p.id}">Edit</button></div>${S.scan.pid===p.id&&(S.scan.busy||S.scan.msg)?`<div class="note" style="margin-top:8px">${esc(S.scan.msg)}${S.scan.busy?"<progress></progress>":""}</div>`:""}
       ${mine.length?`<div class="stack" style="margin-top:12px">${mine.map(c=>`<div class="small muted" style="margin-bottom:-6px">${c.pack?`Pack ${c.pack}`:"Pack not noted"}${c.isHit?" · hit":""}</div>${cardRow(c)}`).join("")}</div>`:`<p class="muted small" style="margin:10px 0 0">No pulls logged for this one yet.</p>`}
     </section>`; }).join("")
-    : `<div class="empty">No products yet.<br><br><button class="btn pri" data-act="seed-naruto">Set up my three Chapter Jin collector boxes</button></div>`;
+    : `<div class="empty">${S.f.tcg==="all"?"No products yet.":"No "+esc(tcgOf(S.f.tcg).label)+" products yet."} Add a box, tin or pack bundle, then log or scan each pull.<br><br><button class="btn pri" data-act="new-product">+ Add a product</button>${(S.f.tcg==="all"||S.f.tcg==="naruto")&&!products().some(p=>p.tcg==="naruto")?` <button class="btn" data-act="seed-naruto">Set up my three Chapter Jin collector boxes</button>`:""}</div>`;
   return `${filterBar()}<h2>Rip log</h2>${head}<div class="stack" style="margin-top:14px;gap:14px">${body}</div><p><button class="btn" data-act="new-product">+ Add a product</button></p>`;
 }
 
@@ -496,7 +497,7 @@ function vValue(){
   const sum=a=>a.reduce((x,c)=>x+(c.bgs-c.raw-(fee||0)),0);
   const waiting=filtered().filter(c=>c.isHit&&c.bgs==null).length;
   return `${filterBar()}<h2>Raw versus Beckett 10</h2>
-  <div class="tiles"><div class="tile"><b>${both.length}</b><span>cards with both numbers</span></div><div class="tile"><b>${money(sum(solid))||"$0.00"}</b><span>gain if graded, verified numbers only${fee?", after fees":""}</span></div><div class="tile"><b style="color:var(--unv)">${money(sum(both)-sum(solid))||"$0.00"}</b><span>extra gain that rests on unverified numbers</span></div><div class="tile"><b>${waiting}</b><span>hits still missing a BGS 10 estimate</span></div></div>
+  <div class="tiles"><div class="tile"><b>${both.length}</b><span>cards with both numbers</span></div><div class="tile"><b>${money(sum(solid))||"$0.00"}</b><span>gain if graded, from verified and estimated numbers${fee?", after fees":""}</span></div><div class="tile"><b style="color:var(--unv)">${money(sum(both)-sum(solid))||"$0.00"}</b><span>extra gain that rests on unverified numbers</span></div><div class="tile"><b>${waiting}</b><span>hits with no graded sales data yet</span></div></div>
   <div class="row" style="margin:12px 0"><label class="f" style="flex:0 1 220px">Beckett fee per card, all in<input type="number" inputmode="decimal" id="gradeFee" placeholder="Enter what you pay" value="${fee??""}"></label><span class="muted small grow">Hatched bars are unverified. A Beckett 10 is never guaranteed, so treat the top bar as a ceiling.</span></div>
   ${list.length?`<div class="stack">${list.map(c=>{ const tc=tcgOf(c.tcg), gain=(c.raw!=null&&c.bgs!=null)?c.bgs-c.raw-(fee||0):null, keepLove=c.decision==="keep"&&(c.reasons||[]).some(r=>r==="Artwork"||r==="Nostalgia"||r==="Favorite character"||r==="Kid's pick");
     const cls=st=>st==="unverified"?"unvb":st==="estimate"?"est":"";
@@ -504,7 +505,7 @@ function vValue(){
       <span class="bars"><span class="bar ${cls(c.rawStatus)}"><span>Raw</span><i style="width:${c.raw!=null?Math.max(1,c.raw/max*100):0}%"></i><span>${c.raw!=null?money(c.raw):"not set"}</span></span>
       <span class="bar b10 ${cls(c.bgsStatus)}"><span>BGS 10</span><i style="width:${c.bgs!=null?Math.max(1,c.bgs/max*100):0}%"></i><span>${c.bgs!=null?money(c.bgs):"not set"}</span></span></span>
       <span class="pills">${serialPill(c)}${decisionPill(c)}${keepLove?`<span class="pill good">keeping it for love, not price</span>`:""}</span></button>`; }).join("")}</div>`
-  : `<div class="empty">Add a raw value or a BGS 10 estimate to any card and it shows up here.</div>`}
+  : `<div class="empty">Cards show up here once they have a raw value or a Beckett 10 value. Both fill in from the market where data exists.</div>`}
   <h2>Grading notes</h2><div class="stack">${REF.gradingNotes.map(n=>`<div class="panel"><b>${esc(n.t)}</b><div class="muted">${esc(n.d)} <a href="${esc(n.url)}" target="_blank" rel="noopener">Source</a></div></div>`).join("")}</div>`;
 }
 
@@ -599,21 +600,21 @@ async function sheetPick(file){
 function cropCell(sh,i){ return new Promise((res,rej)=>{ const cw=sh.im.width/sh.cols, ch=sh.im.height/sh.rows, x=(i%sh.cols)*cw, y=Math.floor(i/sh.cols)*ch, sc=Math.min(1,1000/Math.max(cw,ch)), c=document.createElement("canvas"); c.width=Math.round(cw*sc); c.height=Math.round(ch*sc); c.getContext("2d").drawImage(sh.im,x,y,cw,ch,0,0,c.width,c.height); c.toBlob(b=>b?res(b):rej(new Error("crop")),"image/jpeg",.88); }); }
 function vaultMatch(tcg,name,number){ const n=(name||"").trim().toLowerCase(); if(!n) return null; const num=(number||"").trim().toLowerCase(); const same=cards().filter(c=>c.tcg===tcg&&(c.name||"").trim().toLowerCase()===n); return same.find(c=>num&&(c.number||"").toLowerCase()===num) || (same.length===1&&(!num||!same[0].number)?same[0]:null); }
 async function sheetRead(){
-  const sh=S.sheet; if(!sh||sh.busy) return; sh.busy=true; sh.done=0; sh.msg="Cutting out each pocket."; sh.cells=null; render();
+  const sh=S.sheet; if(!sh||sh.busy) return; sh.busy=true; sh.stop=false; sh.done=0; sh.msg="Cutting out each pocket."; sh.cells=null; render();
   const n=sh.cols*sh.rows, cells=[];
   try{ for(let i=0;i<n;i++){ const blob=await cropCell(sh,i); cells.push({blob,url:URL.createObjectURL(blob),name:"",on:true,tcg:sh.tcg}); } }catch(e){ sh.busy=false; sh.msg="The page could not be cut up. Try a smaller photo."; render(); return; }
   if(hasAI()){
-    let maxN=4; try{ const l=await sample.limits(); maxN=Math.max(1,Math.min(9,(l.images&&l.images.maxCount)||4)); }catch(e){}
+    let maxN=4; try{ if(!(sample&&sampleImages)) throw 0; const l=await sample.limits(); maxN=Math.max(1,Math.min(9,(l.images&&l.images.maxCount)||4)); }catch(e){}
     for(let st=0; st<n; st+=maxN){
-      const part=cells.slice(st,st+maxN); sh.msg=`Claude is reading pockets ${st+1} to ${st+part.length} of ${n}. Each batch can take up to a minute.`; render();
+      const part=cells.slice(st,st+maxN); sh.msg=`${aiName()} is reading pockets ${st+1} to ${st+part.length} of ${n}. Each batch can take up to a minute.`; render();
       const prompt=`You are given ${part.length} photos in order. Each is one pocket cut from a binder page of trading cards, most likely ${tcgOf(sh.tcg).label}. Reply with only a JSON array of exactly ${part.length} objects, one per photo in the same order:
 {"empty": boolean, "tcg": one of ${JSON.stringify(REF.tcgs.map(t=>t.id))}, "name": string, "set": string, "number": string, "rarity": string, "serialSeen": boolean, "confidence": "high" | "medium" | "low"}
 Rules: read only what is visible. Use "" for anything you cannot read. "empty" is true when the pocket holds no card. Never guess a serial number or a price. "number" is the collector number or card code printed on the card. A photo may include slivers of neighbouring cards; describe the card that fills most of it.`;
       try{ const r=await aiJson(prompt,part.map(c=>c.blob)); (Array.isArray(r)?r:[]).slice(0,part.length).forEach((g,k)=>{ const c=part[k]; if(!g||typeof g!=="object") return; const str=v=>typeof v==="string"?v.trim():""; c.empty=!!g.empty; c.name=str(g.name); c.set=str(g.set); c.number=str(g.number); c.rarity=str(g.rarity); c.serialSeen=!!g.serialSeen; c.conf=str(g.confidence)||"low"; if(REF.tcgs.some(t=>t.id===g.tcg)) c.tcg=g.tcg; c.on=!c.empty; c.match=vaultMatch(c.tcg,c.name,c.number); }); }
-      catch(e){ const code=e&&e.code; if(code==="not_granted"||code==="sampling_disabled"||code==="images_unavailable"){ sh.msg="Card reading is switched off for this visit. Name the pockets by hand."; break; } if(code==="rate_limited"){ sh.msg=aiName()+" is busy. The pockets read so far are below, name the rest by hand or try again later."; break; } }
+      catch(e){ const code=e&&e.code; if(code==="not_granted"||code==="sampling_disabled"||code==="images_unavailable"){ sh.msg="Card reading is switched off for this visit. Name the pockets by hand."; break; } if(code==="rate_limited"){ sh.msg=aiName()+" is busy. The pockets read so far are below, name the rest by hand or try again later."; break; } if(!(sample&&sampleImages)){ sh.msg=aiWhy(e)+" Name the pockets by hand, or try again."; sh.stop=true; break; } }
       sh.done=Math.min(n,st+part.length);
     }
-    if(!/switched off|busy/.test(sh.msg)) sh.msg="Check each name against the page before adding. Anything that could not be read is left blank.";
+    if(!sh.stop&&!/switched off|busy/.test(sh.msg)) sh.msg="Check each name against the page before adding. Anything that could not be read is left blank.";
   } else sh.msg="Pockets cut out. Type a name for each card you want to add.";
   sh.cells=cells; sh.busy=false; render();
 }
@@ -676,7 +677,7 @@ async function rcLoad(){
     else { const {id:_,...data}=card; data.updatedAt=Date.now(); let ok=false; for(let t=0;t<4&&!ok;t++){ try{ await db.doc("cards/"+id).set(data); ok=true; }catch(e){ if(e&&e.code==="resource_exhausted") await new Promise(z=>setTimeout(z,3000)); else if(e&&e.code==="unavailable") await new Promise(z=>setTimeout(z,1200)); else { t=9; } } } if(!ok) fail++; }
     RCS.done++; if(RCS.done%8===0){ const p=document.querySelector("progress"); if(p) p.value=RCS.done; }
   }
-  if(S.mode==="local") saveLocal();
+  if(S.mode==="local"&&!saveLocal()){ todo.forEach(r=>{ const id="rc_"+r[5]; if(!JSON.parse(localStorage.getItem(LS)||"{}").cards?.some(c=>c.id===id)) S.cards.delete(id); }); RCS.busy=false; RCS.msg="This browser could not store the cards, so nothing was loaded. Free up space and try again."; render(); return; }
   RCS.busy=false; RCS.msg = fail ? `${RCS.total-fail} cards loaded. ${fail} did not save, tap the button again to finish.` : `${RCS.total} cards loaded from Rare Candy.`; render();
 }
 
@@ -687,7 +688,7 @@ function vHot(){
   const mk=H.market.filter(m=>on(m.tcg)).sort((a,b)=>(a.msrp?low(a)/a.msrp:9)-(b.msrp?low(b)/b.msrp:9)), rates=H.hitRates.filter(r=>on(r.tcg)), radar=H.radar.filter(r=>on(r.tcg));
   const w=[...S.watch.values()].sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   return `${filterBar()}<h2>What's hot</h2><p class="note">${esc(H.note)}</p>
-  <h3 style="margin:18px 0 4px">Market watch: MSRP versus live listings</h3><p class="muted small" style="margin:0 0 8px">${esc(H.msrpNote||"")} Sorted with the best deal against MSRP first.</p>
+  <h3 style="margin:18px 0 4px">Market watch: MSRP versus listed prices</h3><p class="muted small" style="margin:0 0 8px">${esc(H.msrpNote||"")} Sorted with the best deal against MSRP first.</p>
   <div class="stack">${mk.map(m=>{ const top=Math.max(m.msrp||0,...m.listings.map(l=>l.price)); return `<div class="panel" style="border-left:4px solid ${tcgOf(m.tcg).accent}"><div class="row"><b class="grow">${esc(m.product)}</b>${delta(low(m),m.msrp)}</div>
     <div class="bars"><div class="bar ${m.msrpUnconfirmed?"unvb":""}"><span>MSRP</span><i style="width:${m.msrp?m.msrp/top*100:0}%"></i><span>${m.msrp?money(m.msrp):"not confirmed"}</span></div></div>
     ${m.listings.map(l=>`<div class="bars"><div class="bar b10"><span>${money(m.packs>1?l.price/m.packs:l.price)}${m.packs>1?"/pk":""}</span><i style="width:${l.price/top*100}%;background:${m.msrp&&l.price>m.msrp*1.02?"var(--bad)":m.msrp&&l.price<m.msrp*.98?"var(--good)":"var(--accent)"}"></i><span>${money(l.price)}</span></div><div class="small muted" style="margin:-2px 0 2px 70px"><a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.where)}</a> · ${esc(l.asOf)} ${delta(l.price,m.msrp)}</div></div>`).join("")}
@@ -717,7 +718,7 @@ function vSets(){
   return `<h2>Sets</h2><div class="chips scrollx" style="margin-bottom:14px">${tabs.map(t=>`<button class="chip ${tcg===t.id?"on":""}" data-act="set-tcg" data-v="${t.id}">${esc(t.label)}</button>`).join("")}</div>
   <div class="gallery">${[...list,...extra].map(x=>{ const own=cardsInSet(tcg,x.name), n=own.reduce((a,c)=>a+(c.qty||1),0), lad=x.ladder&&REF.sets[x.ladder], total=lad?lad.ladder.reduce((a,r)=>a+r.designs,0):x.total;
     return `<button class="hit" style="--tc:${tcgOf(tcg).accent}" data-act="open-set" data-v="${esc(x.name)}">${emblem(x.name,x.logo||autoLogo(tcg,x))}<span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(x.name)}</b><span class="muted small" style="display:block">${esc([x.era,x.when].filter(Boolean).join(" · "))}</span><span class="pills">${n?`<span class="pill acc">${n} in your vault</span>`:""}${total?`<span class="pill">${total} cards</span>`:""}${lad?`<span class="pill unv">numbered tiers</span>`:""}</span></span></button>`; }).join("")||`<div class="empty">No set list for this game yet. Sets appear here as you add cards.</div>`}</div>
-  ${S.liveSets[tcg]?"":`<p class="muted small" style="margin-top:14px">${S.mode==="cloud"?`Set logos and full card lists with pictures load on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>. Inside Claude you see generated badges and your own cards.`:(tcg==="pokemon"||tcg==="yugioh")?"Loading the live set list.":`Set art from <a href="${REF.artCredit.url}" target="_blank" rel="noopener">${REF.artCredit.label}</a>.`}</p>`}`;
+  ${S.liveSets[tcg]?"":`<p class="muted small" style="margin-top:14px">${S.mode==="cloud"?`Set logos and full card lists with pictures load on <a href="${HOSTED}#sets" target="_blank" rel="noopener">the hosted site</a>. Inside Claude you see generated badges and your own cards.`:(tcg==="pokemon"||tcg==="yugioh")?(S.net==="blocked"?"The live set list could not be reached from this browser, so this is a short built-in list. Reload to try again.":"Loading the live set list."):`Set art from <a href="${REF.artCredit.url}" target="_blank" rel="noopener">${REF.artCredit.label}</a>.`}</p>`}`;
 }
 function expandCatalog(k){ const c=REF.catalog&&REF.catalog[k]; if(!c) return null; if(c._x) return c._x; const out=[];
   if(c.type==="op"){ for(let i=1;i<=c.count;i++){ const num=c.code+"-"+String(i).padStart(3,"0"); out.push({id:num,name:num,number:num,rarity:"",img:"https://images.scrydex.com/onepiece/"+num+"/small",big:"https://images.scrydex.com/onepiece/"+num+"/large"}); } return c._x=out; }
@@ -752,8 +753,8 @@ async function loadLiveSets(tcg){
   if(S.liveSets[tcg]||API.busy["s"+tcg]||S.net==="blocked") return; API.busy["s"+tcg]=1;
   try{
     if(tcg==="pokemon"){ const j=await getJSON(TD+"/sets?sort:field=releaseDate&sort:order=DESC&pagination:itemsPerPage=250"); S.liveSets.pokemon=j.filter(x=>!/^[AB]\d|^P-/.test(x.id)).map(x=>({id:x.id,name:x.name,era:"",when:"",total:x.cardCount&&x.cardCount.total,logo:x.logo?x.logo+".png":""})); API.setNames=Object.fromEntries(j.map(x=>[x.id,x.name])); }
-    else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardsets.php"); S.liveSets.yugioh=(j||[]).filter(x=>x.tcg_date).sort((a,b)=>b.tcg_date.localeCompare(a.tcg_date)).slice(0,60).map(x=>({name:x.set_name,era:x.set_code,when:x.tcg_date.slice(0,7),total:x.num_of_cards,logo:x.set_image||""})); }
-    netOk(); if(S.view==="sets"&&!S.setOpen&&!sheetOpen()) render();
+    else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardsets.php"); S.liveSets.yugioh=(j||[]).filter(x=>x.tcg_date).sort((a,b)=>b.tcg_date.localeCompare(a.tcg_date)).slice(0,150).map(x=>({name:x.set_name,era:x.set_code,when:x.tcg_date.slice(0,7),total:x.num_of_cards,logo:x.set_image||""})); }
+    netOk(); if(S.view==="sets"&&!S.setOpen&&!sheetOpen()) render(); if(sheetOpen()&&draft&&draft.kind==="card"&&!draft.picking&&draft.obj.tcg===tcg) refreshSetSel();
   }catch(e){ if(netFail()) setTimeout(()=>{ if(S.view==="sets") loadLiveSets(tcg); },retryIn()); }
   API.busy["s"+tcg]=0;
 }
@@ -766,16 +767,16 @@ async function loadSetCards(o0){
     else if(op){ const code=REF.catalog[o.catalog].code, j=await opSet(code); list=j.map(c=>({id:c.card_image_id||c.card_set_id,name:opName(c),number:c.card_set_id,rarity:c.rarity||"",price:num(c.market_price)||null,asOf:c.date_scraped||"",img:c.card_image||"https://images.scrydex.com/onepiece/"+c.card_set_id+"/small",big:c.card_image||"https://images.scrydex.com/onepiece/"+c.card_set_id+"/large"})).sort((a,b)=>(b.price||0)-(a.price||0)||a.number.localeCompare(b.number)); }
     else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?num=400&offset=0&cardset="+encodeURIComponent(o.name)); list=(j.data||[]).map(c=>{ const cs=(c.card_sets||[]).find(x=>x.set_name===o.name)||{}, im=(c.card_images||[])[0]||{}; return {id:String(c.id),name:c.name,number:cs.set_code||"",rarity:cs.set_rarity||"",price:num(cs.set_price)||null,img:im.image_url_small||"",big:im.image_url||""}; }); }
     API.setCards[key]={cards:list,meta}; netOk();
-  }catch(e){ API.setCards[key]={cards:[],err:true}; if(op) return; setTimeout(()=>{ delete API.setCards[key]; },20000); }
+  }catch(e){ API.setCards[key]={cards:[],err:true}; setTimeout(()=>{ delete API.setCards[key]; },20000); if(op) return; }
   if(S.view==="sets"&&!sheetOpen()) render();
 }
-async function pokeDetail(id){ try{ const d=await getJSON(TD+"/cards/"+encodeURIComponent(id)); let price=null; const tp=d.pricing&&d.pricing.tcgplayer; if(tp) for(const k of Object.keys(tp)){ const v=tp[k]; if(v&&typeof v==="object"&&v.marketPrice!=null){ price=Math.max(price||0,v.marketPrice); } } return {rarity:d.rarity||"",price,setName:d.set&&d.set.name||""}; }catch(e){ return {}; } }
+async function pokeDetail(id){ try{ const d=await getJSON(TD+"/cards/"+encodeURIComponent(id)); const price=tdPick(d); return {rarity:d.rarity||"",price,setName:d.set&&d.set.name||""}; }catch(e){ return {}; } }
 async function addCatalogCard(tcg,setName,cc,m){
   let extra={}; if(tcg==="pokemon"){ toast("Getting card details."); extra=await pokeDetail(cc.id); }
   if(tcg==="onepiece"){ cardSheet({tcg,name:cc.name,set:setName,number:cc.number,rarity:cc.rarity||"",imageUrl:cc.big||cc.img||"",catalogId:cc.id,serial:"no",source:"catalog",...(cc.price?{raw:cc.price,rawStatus:"estimate",rawSource:"market",rawNote:"OPTCG API market"+(cc.asOf?", "+cc.asOf:"")}:{})},true); return; }
   if(tcg==="naruto"||tcg==="kpdh"){ cardSheet({tcg,name:cc.name,character:cc.name,set:setName,number:cc.number,rarity:cc.rarity||"",imageUrl:cc.big||cc.img||"",catalogId:cc.id,serial:cc.run?"unverified":"no",serialRun:cc.run?String(cc.run):"",source:"catalog",isHit:!!cc.run,raw:cc.price||null,rawStatus:cc.price?"estimate":"unverified",rawSource:cc.price?"market":"",rawNote:cc.price?"DeckTradr market, "+((REF.kayouPrice||{}).asOf||""):""},true); return; }
   const raw=extra.price!=null?extra.price:(cc.price!=null?cc.price:null);
-  cardSheet({tcg,name:cc.name,set:setName||extra.setName||"",number:cc.number||"",rarity:extra.rarity||cc.rarity||"",imageUrl:cc.big||cc.img||"",catalogId:cc.id,raw,rawStatus:raw!=null?"estimate":"unverified",serial:"no",source:"catalog"},true);
+  cardSheet({tcg,name:cc.name,set:setName||extra.setName||"",number:cc.number||"",rarity:extra.rarity||cc.rarity||"",imageUrl:cc.big||cc.img||"",catalogId:cc.id,raw,rawStatus:raw!=null?"estimate":"unverified",...(raw!=null?{rawSource:"market",rawNote:tcg==="pokemon"?"TCGplayer market":tcg==="yugioh"?"YGOPRODeck":""}:{}),serial:"no",source:"catalog"},true);
 }
 
 /* ---------- serial checklist ---------- */
@@ -807,9 +808,10 @@ function cardSheet(c, isNew){
   draft={kind:"card",isNew,obj:{qty:1,serial:"unverified",rawStatus:"unverified",bgsStatus:"unverified",decision:"undecided",reasons:[],tcg:S.f.tcg!=="all"?S.f.tcg:"naruto",owner:S.f.owner!=="all"?S.f.owner:S.settings.owners[0],...c}};
   drawCardSheet();
 }
+function unlinkCatalog(c){ if(c.catalogId){ delete c.catalogId; if(c.rawSource==="market"&&c.rawStatus!=="verified"){ c.raw=null; c.rawStatus="unverified"; c.rawSource=""; c.rawNote=""; } if(c.imageUrl&&!/^data:/.test(c.imageUrl)&&c.source!=="rarecandy") c.imageUrl=""; } }
 function setObj(c){ const b=normSet(c.set); return b?setList(c.tcg).find(x=>normSet(x.name)===b):null; }
 function pickList(){ const c=draft.obj, o=setObj(c), d=o&&setData({tcg:c.tcg,...o}), q=(draft.pickQ||"").trim().toLowerCase(); const all=d&&d.cards||[]; return {o,d,all,list:q?all.filter(x=>{ const h=(x.name+" "+x.number+" "+(x.rarity||"")).toLowerCase(); return q.split(/\s+/).every(t=>h.includes(t)); }):all}; }
-function pickGrid(){ const {d,all,list}=pickList(); if(!all.length) return d&&d.err?`<p class="note">The card list for this set could not be loaded. Go back and type the card in.</p>`:`<p class="muted">Loading the card list.</p><progress></progress>`;
+function pickGrid(){ const {d,all,list}=pickList(); if(!all.length) return (d&&d.err)||draft.pickDead?`<p class="note">The card list for this set could not be loaded${S.mode==="cloud"?" inside Claude. It loads on the hosted site":""}. Go back and type the card in.</p>`:`<p class="muted">Loading the card list.</p><progress></progress>`;
   return `<p class="muted small">${list.length} of ${all.length} cards${list.length>90?", showing the first 90. Type to narrow it down.":""}</p><div class="gallery">${list.slice(0,90).map(x=>`<button type="button" class="hit" style="--tc:${tcgOf(draft.obj.tcg).accent}" data-act="pick-card" data-i="${all.indexOf(x)}"><span class="art">${esc(SHORT[draft.obj.tcg]||"")}${x.img&&S.mode!=="cloud"?`<img src="${esc(x.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span><span class="cap"><b style="overflow-wrap:anywhere">${esc(x.name)}</b><span class="muted small" style="display:block">${esc([x.number===x.name?"":x.number,x.rarity].filter(Boolean).join(" · "))}</span></span></button>`).join("")}</div>`; }
 function drawPicker(){ const c=draft.obj; openSheet(`<div class="stack"><div class="row"><h2 style="margin:0" class="grow">Pick the card</h2><button type="button" class="btn ghost" data-act="pick-close">Back</button></div><span class="muted">${esc(c.set)}</span><input type="search" id="pickQ" placeholder="Name, number or rarity" value="${esc(draft.pickQ||"")}"><div id="pickGrid">${pickGrid()}</div></div>`); }
 function codeParts(v){ const n=String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,"").replace(/(\d{2,3})L\d{1,2}$/,"$1"); let m=n.match(/^([A-Z]{2,6}\d{2})([A-Z]{1,4})(\d{2,3})$/); if(m) return {norm:n,prefix:m[1],tier:m[2],no:m[3].padStart(3,"0")}; m=n.match(/^([A-Z]{2,6}\d{2})([A-Z]{1,4})$/); if(m) return {norm:n,prefix:m[1],tier:m[2],no:""}; m=n.match(/^([A-Z]{4,6}\d{2})$/); if(m) return {norm:n,prefix:m[1],tier:"",no:""}; m=n.match(/^([A-Z]{1,4})(\d{2,3})$/); if(m) return {norm:n,prefix:"",tier:m[1],no:m[2].padStart(3,"0")}; return {norm:n,prefix:"",tier:/^[A-Z]{1,4}$/.test(n)?n:"",no:""}; }
@@ -837,8 +839,12 @@ async function formPhoto(b){ const d=draft; if(!d||d.kind!=="card") return; read
   if(c.serial!=="yes"&&guess.serialVisible==="yes"&&str(guess.serialNo)){ c.serial="yes"; c.serialNo=str(guess.serialNo); c.serialRun=str(guess.serialRun); }
   const so=setObj(c); if(so) c.set=so.name; const matched=matchCatalog(c);
   d.reading=false; d.photoNote=note+(matched?" Matched to "+c.number+" in the set list.":d.cands&&setObj(c)?" "+d.cands+" possible matches in "+c.set+". Tap Pick the card to choose.":d.cands?" Choose the set, then tap Pick the card to see the likely matches.":""); d.market=null; drawCardSheet(); }
+function setOpts(c){ const names=[...new Set([...setList(c.tcg).map(x=>x.name),...cards().filter(x=>x.tcg===c.tcg&&x.set).map(x=>x.set)])], canon=names.find(n=>normSet(n)===normSet(c.set)); if(canon&&canon!==c.set&&!draft.setOther) c.set=canon; const known=!!canon, other=draft.setOther||(!!c.set&&!known);
+  return {other,html:`<option value="">Choose a set</option>${names.map(n=>`<option value="${esc(n)}" ${!other&&n===c.set?"selected":""}>${esc(n)}</option>`).join("")}<option value="__other" ${other?"selected":""}>Other, type it in</option>`}; }
+function refreshSetSel(){ const el=$("#cSetSel"); if(!el||!draft||draft.kind!=="card") return; const a=document.activeElement; if(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)&&$("#sheetBox").contains(a)){ const cur=el.value; el.innerHTML=setOpts({...draft.obj,set:cur==="__other"||!cur?draft.obj.set:cur}).html; return; } const pp=pendingPhoto; readCardForm(); pendingPhoto=pp; drawCardSheet(); }
 function drawCardSheet(){
   if(draft.picking){ drawPicker(); return; }
+  if((draft.obj.tcg==="pokemon"||draft.obj.tcg==="yugioh")&&!S.liveSets[draft.obj.tcg]&&S.mode!=="cloud") loadLiveSets(draft.obj.tcg);
   const c=draft.obj, src=pendingPhoto?URL.createObjectURL(pendingPhoto):imgSrc(c), ps=products().filter(p=>p.tcg===c.tcg), rule=serialRule(c);
   if(rule.mode==="never") c.serial="no"; else if(rule.mode==="always"&&c.serial==="no") c.serial="unverified";
   setTimeout(loadSheetMarket,0);
@@ -850,8 +856,7 @@ function drawCardSheet(){
      <div class="row"><label class="btn" for="cPhoto">${src?"Replace photo":"Add photo"}</label><input type="file" id="cPhoto" accept="image/*" hidden></div></div></div>
    <div class="grid2"><label class="f">Game<select id="cTcg">${REF.tcgs.map(t=>`<option value="${t.id}" ${c.tcg===t.id?"selected":""}>${esc(t.label)}</option>`).join("")}</select></label>
      <label class="f">Collector<select id="cOwner">${S.settings.owners.map(o=>`<option ${c.owner===o?"selected":""}>${esc(o)}</option>`).join("")}</select></label></div>
-   <div class="grid3">${(()=>{ const names=[...new Set([...setList(c.tcg).map(x=>x.name),...cards().filter(x=>x.tcg===c.tcg&&x.set).map(x=>x.set)])], known=names.some(n=>n===c.set), other=draft.setOther||(!!c.set&&!known);
-       return `<label class="f">Set<select id="cSetSel"><option value="">Choose a set</option>${names.map(n=>`<option value="${esc(n)}" ${!other&&n===c.set?"selected":""}>${esc(n)}</option>`).join("")}<option value="__other" ${other?"selected":""}>Other, type it in</option></select><input type="${other?"text":"hidden"}" id="cSet" value="${esc(c.set)}" placeholder="Set name" style="margin-top:6px"></label>`; })()}<label class="f">Card number<input type="text" id="cNumber" value="${esc(c.number)}"></label>
+   <div class="grid3">${(()=>{ const so=setOpts(c); return `<label class="f">Set<select id="cSetSel">${so.html}</select><input type="${so.other?"text":"hidden"}" id="cSet" value="${esc(c.set)}" placeholder="Set name" style="margin-top:6px"></label>`; })()}<label class="f">Card number<input type="text" id="cNumber" value="${esc(c.number)}"></label>
      <label class="f">Rarity<input type="text" id="cRarity" list="rarList" value="${esc(c.rarity)}"><datalist id="rarList">${(REF.rarities[c.tcg]||[]).map(r=>`<option value="${esc(r)}">`).join("")}</datalist></label></div>
    <div class="grid3"><label class="f">Pulled from<select id="cProduct"><option value="">${ps.length?"Not from a tracked product":"No "+esc(tcgOf(c.tcg).label)+" products in your Rip log yet"}</option>${ps.map(p=>`<option value="${p.id}" ${c.productId===p.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>
      <label class="f">Pack number<input type="number" inputmode="numeric" id="cPack" value="${c.pack??""}"></label><label class="f">Quantity<input type="number" inputmode="numeric" id="cQty" value="${c.qty||1}"></label></div>
@@ -878,6 +883,7 @@ function drawCardSheet(){
    <div class="row"><button class="btn pri grow" type="submit">Save card</button>${draft.isNew?"":`<button type="button" class="btn danger" data-act="del-card">Delete</button>`}</div></form>`);
 }
 function readCardForm(){
+  if(!draft||draft.kind!=="card"||!document.getElementById("cardForm")) return;
   const c=draft.obj, g=id=>{ const e=document.getElementById(id); return e?e.value.trim():undefined; };
   const set=(k,v)=>{ if(v!==undefined) c[k]=v; };
   set("name",g("cName")); set("character",g("cChar")); set("tcg",g("cTcg")); set("owner",g("cOwner")); set("set",g("cSet")); set("number",g("cNumber")); set("rarity",g("cRarity"));
@@ -985,13 +991,16 @@ async function doSearch(more){
       netOk();
     }catch(e){ netFail(); out=null; }
   }
+  if(out===null&&(s.tcg==="naruto"||s.tcg==="kpdh")&&!more){ const toks=q.toLowerCase().split(/\s+/).filter(Boolean); out=[]; for(const e of REF.setList[s.tcg]||[]){ if(!e.catalog) continue; for(const x of expandCatalog(e.catalog)||[]){ const h=(x.name+" "+x.number+" "+x.rarity+" "+e.name).toLowerCase(), hn=h.replace(/[^a-z0-9]/g,""); if(toks.every(t=>h.includes(t)||hn.includes(t.replace(/[^a-z0-9]/g,"")||"~"))) out.push({tcg:s.tcg,name:x.name,set:e.name,number:x.number,rarity:x.rarity,img:S.mode==="cloud"?"":x.img,imageUrl:S.mode==="cloud"?"":x.big,raw:x.price||null,cc:x}); } } out.sort((a,b)=>(b.raw||0)-(a.raw||0)); s.total=0; s.more=false; if(out.length>120){ s.note="Showing the first 120 of "+out.length+" matches. Add a rarity or card number to narrow it down."; out=out.slice(0,120); } }
+  if(out===null&&s.tcg==="onepiece"&&S.mode!=="cloud"&&!more){ try{ const codes=Object.values(REF.catalog||{}).filter(c=>c.type==="op").map(c=>c.code), m=q.toUpperCase().match(/^([A-Z]{2}\d{2})/), want=m&&codes.includes(m[1])?[m[1]]:codes, toks=q.toLowerCase().split(/\s+/).filter(Boolean); s.note="Searching "+want.length+" One Piece set"+(want.length===1?"":"s")+"."; render(); const got=await Promise.all(want.map(c=>opSet(c).catch(()=>[]))); out=[];
+      got.flat().forEach(c=>{ const h=(c.card_name+" "+c.card_set_id+" "+(c.rarity||"")+" "+(c.set_name||"")).toLowerCase(); if(toks.every(t=>h.includes(t))) out.push({tcg:"onepiece",name:opName(c),set:c.set_name||"",number:c.card_set_id,rarity:c.rarity||"",img:c.card_image||"",imageUrl:c.card_image||"",raw:num(c.market_price)||null,cc:{id:c.card_image_id||c.card_set_id,name:opName(c),number:c.card_set_id,rarity:c.rarity||"",price:num(c.market_price)||null,asOf:c.date_scraped||"",img:c.card_image||"",big:c.card_image||""}}); }); out.sort((a,b)=>(b.raw||0)-(a.raw||0)); s.note=""; s.total=0; s.more=false; if(out.length>120){ s.note="Showing the first 120 of "+out.length+" matches. Add more of the name or the card code."; out=out.slice(0,120); } netOk(); }catch(e){ out=null; s.note=""; } }
   if(out===null){
     if(sample){
       try{ const r=await sample.json(`List up to 8 real ${tcgOf(s.tcg).label} trading cards that match the search "${q.slice(0,80)}". Reply with only a JSON array of {"name": string, "set": string, "number": string, "rarity": string} objects. Only include cards you are confident exist; use "" for a field you are not sure of. No prices. If you know none, reply [].`,{modelTier:"quick"});
         out=(Array.isArray(r)?r:[]).filter(x=>x&&x.name).slice(0,8).map(x=>({tcg:s.tcg,name:String(x.name),set:String(x.set||""),number:String(x.number||""),rarity:String(x.rarity||""),raw:null}));
         s.note="These catalog matches come from Claude's general knowledge, with no pictures or prices. Check them against the card in your hand."; }
       catch(e){ out=[]; s.note="The catalog could not be searched right now. You can still add the card by hand or scan it."; }
-    } else { out=[]; s.note = (s.tcg==="pokemon"||s.tcg==="yugioh") ? "The live catalog could not be reached. Add the card by hand or scan it." : "There is no public catalog for this game yet. Add the card by hand or scan it."; }
+    } else { out=[]; s.note = (s.tcg==="pokemon"||s.tcg==="yugioh") ? "The live catalog could not be reached. Add the card by hand or scan it." : (s.tcg==="onepiece"&&S.mode==="cloud"?"One Piece search loads on the hosted site.":"There is no public catalog for this game yet.")+" Add the card by hand or scan it."; }
   }
   if(more&&(!out||!out.length)&&prev.length){ s.more=false; out=[]; } s.results=prev.concat(out||[]); s.busy=false; render();
 }
@@ -1017,7 +1026,7 @@ async function impPreview(){
 async function impGo(){
   const im=S.imp; if(!im.rows) return; im.busy=true; im.done=0; im.total=im.rows.length; render(); let fail=0;
   const mk=r=>({id:uid("c_"),createdAt:Date.now(),tcg:im.tcg,owner:im.owner,name:r.name,set:r.set,number:r.number,qty:r.qty,rarity:r.rarity,raw:r.raw,rawStatus:r.raw!=null?"estimate":"unverified",bgsStatus:"unverified",serial:"no",decision:"undecided",reasons:[],condition:normCond(r.condition),finish:normFin(im.tcg,r.finish),language:normLang(r.language),grade:r.grade||(r.condition&&!normCond(r.condition)&&/\d/.test(r.condition)?r.condition:""),notes:[r.condition&&!normCond(r.condition)&&!/\d/.test(r.condition)?"Condition: "+r.condition:"",r.finish&&!normFin(im.tcg,r.finish)?"Finish: "+r.finish:""].filter(Boolean).join(". "),source:"import"});
-  if(S.mode==="local"){ im.rows.forEach(r=>{ const c=mk(r); S.cards.set(c.id,c); }); saveLocal(); im.done=im.total; }
+  if(S.mode==="local"){ const made=im.rows.map(mk); made.forEach(c=>S.cards.set(c.id,c)); if(!saveLocal()){ made.forEach(c=>S.cards.delete(c.id)); im.busy=false; im.msg="This browser could not store the cards, so nothing was imported. Free up space and try again."; render(); return; } im.done=im.total; }
   else { for(const r of im.rows){ const c=mk(r), {id,...data}=c; let ok=false; for(let t=0;t<2&&!ok;t++){ try{ await db.doc("cards/"+id).set(data); ok=true; }catch(e){ if(e&&e.code==="resource_exhausted") await new Promise(z=>setTimeout(z,2500)); else break; } } if(!ok) fail++; im.done++; if(im.done%10===0){ const p=document.querySelector("progress"); if(p) p.value=im.done; } } }
   im.busy=false; im.msg = fail ? `Imported ${im.total-fail} cards. ${fail} did not save, so run the import again later for those.` : `Imported ${im.total} cards.`; im.rows=null; render();
 }
@@ -1047,7 +1056,8 @@ document.addEventListener("click", async e=>{
   else if(a==="sel-none"){ S.sel=new Set(); render(); }
   else if(a==="bulk"){ const k=b.dataset.k, on=b.dataset.v==="1"; bulkApply({[k]:on}, k==="isHit"?(on?"Added to hits":"Removed from hits"):(on?"Marked top loaded":"Marked not top loaded")); }
   else if(a==="mkt-refresh") marketRefresh();
-  else if(a==="pick-open"){ const pp=pendingPhoto; readCardForm(); pendingPhoto=pp; const d=draft, c=d.obj, o=setObj(c); d.picking=true; d.pickQ=d.cands?d.pickQ||"":""; drawCardSheet(); if(o&&!setData({tcg:c.tcg,...o})) loadSetCards({tcg:c.tcg,...o}).then(()=>{ if(draft===d&&d.picking){ const g=$("#pickGrid"); if(g) g.innerHTML=pickGrid(); } }); }
+  else if(a==="pick-open"){ const pp=pendingPhoto; readCardForm(); pendingPhoto=pp; const d=draft, c=d.obj, o=setObj(c); d.picking=true; d.pickDead=false; d.pickQ=d.cands?d.pickQ||"":""; drawCardSheet();
+    (async()=>{ let o2=o; if(o2&&c.tcg==="pokemon"&&!o2.id&&S.mode!=="cloud"){ await loadLiveSets("pokemon"); o2=setObj(c)||o2; } const od=o2&&{tcg:c.tcg,...o2}; if(od&&!setData(od)) await loadSetCards(od); const dd=od&&setData(od); if(!dd||(!dd.loading&&!(dd.cards||[]).length)) d.pickDead=true; if(draft===d&&d.picking){ const g=$("#pickGrid"); if(g) g.innerHTML=pickGrid(); } })(); }
   else if(a==="ai-on"){ const v=(($("#aiKeyIn")||{}).value||"").trim(); if(v.length<20){ S.aiMsg="That does not look like a key. Copy the whole thing from AI Studio."; render(); } else { try{ localStorage.setItem(AIK,v); }catch(e){ S.aiMsg="This browser would not store the key."; render(); return; } aiTest(); } }
   else if(a==="ai-off"){ try{ localStorage.removeItem(AIK); }catch(e){} API.gem=null; S.aiMsg=""; render(); }
   else if(a==="ai-test") aiTest();
@@ -1083,6 +1093,7 @@ document.addEventListener("click", async e=>{
   else if(a==="search-more") doSearch(true);
   else if(a==="mine-all"){ S.search.mineAll=true; render(); }
   else if(a==="add-result"&&S.search.results[+b.dataset.i]&&S.search.results[+b.dataset.i].tdId){ const r=S.search.results[+b.dataset.i]; viewSheet("pokemon",r.set,{id:r.tdId,name:r.name,number:r.number,big:r.imageUrl,img:r.img}); }
+  else if(a==="add-result"&&S.search.results&&S.search.results[+b.dataset.i]&&S.search.results[+b.dataset.i].cc){ const r=S.search.results[+b.dataset.i]; viewSheet(r.tcg,r.set,r.cc); }
   else if(a==="add-result"){ const r=S.search.results[+b.dataset.i]; if(r) cardSheet({tcg:r.tcg,name:r.name,set:r.set,number:r.number,rarity:r.rarity,imageUrl:r.imageUrl||"",raw:r.raw,rawStatus:r.raw!=null?"estimate":"unverified",serial:r.tcg==="naruto"||r.tcg==="kpdh"?"unverified":"no",source:"search"},true); }
   else if(a==="imp-preview") impPreview();
   else if(a==="imp-go") impGo();
@@ -1099,7 +1110,7 @@ document.addEventListener("submit", e=>{ e.preventDefault(); const id=e.target.i
   else if(id==="ownerForm"){ const n=$("#oName").value.trim(); if(!n) return; if(!S.settings.owners.includes(n)) S.settings.owners=[...S.settings.owners,n]; saveSettings().then(()=>{ toast(n+" added."); closeSheet(); }); }
 });
 document.addEventListener("pointerdown", e=>{ S.submitDown = e.target.closest&&e.target.closest("#cardForm button[type=submit]") ? Date.now() : 0; }, true);
-document.addEventListener("change", e=>{ const t=e.target;
+function onChange(e){ const t=e.target;
   if(t.id==="cFinish"&&draft&&draft.kind==="card"){ readCardForm(); draft.market=null; const c=draft.obj; if(c.rawSource==="market"&&c.rawStatus!=="verified") c.raw=null; drawCardSheet(); return; }
   if(t.id==="fDecision"){ S.f.decision=t.value; render(); }
   else if(t.id==="gradeFee"){ S.settings.gradeFee=num(t.value); saveSettings(); if(S.mode==="cloud") render(); }
@@ -1113,15 +1124,16 @@ document.addEventListener("change", e=>{ const t=e.target;
   else if(t.dataset.act==="cell-on"){ document.querySelectorAll("[data-cell]").forEach(el=>{ S.sheet.cells[+el.dataset.cell].name=el.value.trim(); }); S.sheet.cells[+t.dataset.i].on=t.checked; render(); }
   else if(t.id==="gFront"||t.id==="gBack"){ const f=t.files[0], k=t.id, d=draft; if(f&&d) shrink(f,2000,.9).then(b=>{ if(draft!==d) return; const pp=pendingPhoto; readCardForm(); pendingPhoto=pp; d[k]=b; d.gMsg=""; drawCardSheet(); }).catch(()=>toast("That photo could not be read.")); }
   else if(t.id==="cPhoto"){ const f=t.files[0]; if(f) shrink(f,1800,.9).then(b=>formPhoto(b)).catch(()=>toast("That photo could not be read.")); }
-  else if(t.id==="cSetSel"){ const v=t.value, pp=pendingPhoto; readCardForm(); draft.setOther=v==="__other"; if(v!=="__other") draft.obj.set=v; draft.market=null; pendingPhoto=pp; drawCardSheet(); if(draft.setOther){ const e=$("#cSet"); if(e) e.focus(); } }
-  else if(t.id==="cTcg"||t.id==="cRarity"||t.id==="cSet"||t.id==="cNumber"){ const pp=pendingPhoto; readCardForm(); pendingPhoto=pp; if(t.id==="cNumber"&&!draft.obj.name&&!draft.obj.character) matchCatalog(draft.obj); draft.market=null; drawCardSheet(); if(Date.now()-(S.submitDown||0)<900){ S.submitDown=0; saveCard(); } }
+  else if(t.id==="cSetSel"){ const v=t.value, pp=pendingPhoto; readCardForm(); draft.setOther=v==="__other"; if(v!=="__other"&&v!==draft.obj.set){ draft.obj.set=v; unlinkCatalog(draft.obj); } draft.market=null; pendingPhoto=pp; drawCardSheet(); if(draft.setOther){ const e=$("#cSet"); if(e) e.focus(); } }
+  else if(t.id==="cTcg"||t.id==="cRarity"||t.id==="cSet"||t.id==="cNumber"){ const pp=pendingPhoto; readCardForm(); pendingPhoto=pp; if(t.id!=="cRarity") unlinkCatalog(draft.obj); if(t.id==="cTcg"){ draft.setOther=false; if(draft.obj.set&&!setList(draft.obj.tcg).some(x=>normSet(x.name)===normSet(draft.obj.set))) draft.obj.set=""; } if(t.id==="cNumber"){ const o=draft.obj, P=codeParts(o.number); if(!o.name&&!o.character) matchCatalog(o); else if(P.prefix&&P.tier&&P.no&&(o.tcg==="naruto"||o.tcg==="kpdh")){ const keep=o.character; o.character=""; if(!matchCatalog(o)) o.character=keep; } } draft.market=null; drawCardSheet(); if(Date.now()-(S.submitDown||0)<900){ S.submitDown=0; saveCard(); } }
   else if(t.id==="bulkDecision"&&t.value){ bulkApply({decision:t.value},"Decision set to "+t.value); }
   else if(t.id==="bulkProduct"&&t.value){ bulkApply({productId:t.value==="-"?"":t.value},"Pulled from updated"); }
   else if(t.id==="bulkOwner"&&t.value){ bulkApply({owner:t.value},"Collector set to "+t.value); }
   else if(t.id==="serialCard"){ S.serialCard=t.value; S.serialTicks={}; render(); }
   else if(t.dataset.act==="tick"){ S.serialTicks[t.dataset.i]=t.checked; render(); }
   else if(t.id==="stcg"){ S.search.tcg=t.value; S.search.results=null; S.search.note=""; S.search.q=$("#sq").value; render(); }
-});
+}
+document.addEventListener("change", e=>{ if(S.chg) return; S.chg=true; try{ onChange(e); } finally{ S.chg=false; } });
 let qt; document.addEventListener("input", e=>{ if(e.target.id==="pickQ"&&draft){ draft.pickQ=e.target.value; const g=$("#pickGrid"); if(g) g.innerHTML=pickGrid(); return; } if(e.target.id==="q"){ S.f.q=e.target.value; clearTimeout(qt); qt=setTimeout(()=>{ S.more=60; render(); const el=$("#q"); if(el){ el.focus(); el.setSelectionRange(el.value.length,el.value.length); } },250); } });
 document.addEventListener("keydown", e=>{ if(e.key==="Enter"&&e.target.id==="sq"){ e.preventDefault(); doSearch(); } if(e.key==="Escape"&&sheetOpen()) closeSheet();
   if(e.key==="Tab"&&sheetOpen()){ const box=$("#sheetBox"), f=[...box.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x=>x.offsetParent!==null); if(!f.length){ e.preventDefault(); return; } const a=document.activeElement, first=f[0], last=f[f.length-1]; if(!box.contains(a)||(e.shiftKey&&(a===first||a===box))){ e.preventDefault(); last.focus(); } else if(!e.shiftKey&&a===last){ e.preventDefault(); first.focus(); } } });
