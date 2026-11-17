@@ -189,6 +189,7 @@ nav.mainnav a.on svg{color:var(--accent)}
   nav.mainnav a:hover{color:var(--text)}
 }
 #sheetBox:focus{outline:none}
+details.inset>summary{cursor:pointer;list-style-position:inside}
 </style>
 </head>
 <body>
@@ -349,11 +350,19 @@ function filterBar(){
   </div>`;
 }
 function totals(list){ const t={n:0,raw:0,rawUnv:0,bgs:0,noVal:0,unvSerial:0}; list.forEach(c=>{ const q=c.qty||1; t.n+=q; if(c.raw!=null){ if(c.rawStatus==="unverified") t.rawUnv+=c.raw*q; else t.raw+=c.raw*q; } else t.noVal++; if(c.bgs!=null) t.bgs+=c.bgs*q; if(serialOf(c)==="unverified") t.unvSerial++; }); return t; }
+const FIN={pokemon:[["normal","Normal"],["holofoil","Holo"],["reverse-holofoil","Reverse holo"],["1st-edition","1st Edition"],["1st-edition-holofoil","1st Edition holo"]],yugioh:[["1st","1st Edition"],["unlimited","Unlimited"],["limited","Limited Edition"]],other:[["standard","Standard"],["foil","Foil"]]};
+const COND=[["nm","Near mint"],["lp","Lightly played"],["mp","Moderately played"],["hp","Heavily played"],["dmg","Damaged"]], LANG=[["en","English"],["ja","Japanese"],["zh","Chinese"],["ko","Korean"],["other","Other"]];
+function finOpts(t){ return FIN[t]||FIN.other; }
+function lab(list,v){ const x=list.find(o=>o[0]===v); return x?x[1]:""; }
+function copyBits(c){ return [lab(finOpts(c.tcg),c.finish),c.grade?c.grade:(c.condition?c.condition.toUpperCase():""),c.language&&c.language!=="en"?lab(LANG,c.language):""].filter(Boolean); }
+function normCond(v){ const t=String(v||"").toLowerCase().replace(/[^a-z]/g,""); return !t?"":/^(nm|nearmint|mint|m|nmm|nearmintormint)$/.test(t)?"nm":/^(lp|lightlyplayed|excellent|ex|lightplayed)$/.test(t)?"lp":/^(mp|moderatelyplayed|good|played|gd)$/.test(t)?"mp":/^(hp|heavilyplayed|poor)$/.test(t)?"hp":/^(dmg|damaged|d)$/.test(t)?"dmg":""; }
+function normLang(v){ const t=String(v||"").toLowerCase().trim(); return !t?"":/^(en|eng|english)$/.test(t)?"en":/^(ja|jp|jpn|japanese)$/.test(t)?"ja":/^(zh|cn|chinese|s-chinese|t-chinese)/.test(t)?"zh":/^(ko|kr|korean)$/.test(t)?"ko":"other"; }
+function normFin(tcg,v){ const t=String(v||"").toLowerCase(); if(!t) return ""; if(tcg==="pokemon") return /1st/.test(t)?(/holo/.test(t)?"1st-edition-holofoil":"1st-edition"):/reverse/.test(t)?"reverse-holofoil":/holo|foil/.test(t)?"holofoil":/normal|non|regular/.test(t)?"normal":""; if(tcg==="yugioh") return /1st/.test(t)?"1st":/unlimited/.test(t)?"unlimited":/limited/.test(t)?"limited":""; return /foil|holo/.test(t)?"foil":/normal|standard|regular|non/.test(t)?"standard":""; }
 function cardRow(c,sel){
   const tc=tcgOf(c.tcg), on=sel&&S.sel.has(c.id);
   return `<button class="card ${on?"picked":""}" style="--tc:${tc.accent}" data-act="${sel?"sel-card":"edit-card"}" data-id="${c.id}">${sel?`<span class="tick ${on?"on":""}"></span>`:""}${thumb(c)}
     <span class="grow"><span class="t">${esc(c.name||c.character||"Unnamed card")}${(c.qty||1)>1?` <span class="muted">×${c.qty}</span>`:""}</span>
-      <span class="muted small" style="display:block">${esc([tc.label,c.set,c.number].filter(Boolean).join(" · "))}</span>
+      <span class="muted small" style="display:block">${esc([tc.label,c.set,c.number,...copyBits(c)].filter(Boolean).join(" · "))}</span>
       <span class="pills">${c.rarity?`<span class="pill">${esc(c.rarity)}</span>`:""}${serialPill(c)}${c.toploaded?`<span class="pill">top loaded</span>`:""}${decisionPill(c)}${c.owner&&S.settings.owners.length>1?`<span class="pill">${esc(c.owner)}</span>`:""}</span></span>
     <span class="val">${c.raw!=null?`<b>${money(c.raw)}</b>${valStatusPill(c.rawStatus)}`:`<small>no value yet</small>`}${c.bgs!=null?`<small style="display:block">BGS 10 ${money(c.bgs)}</small>`:""}</span></button>`;
 }
@@ -396,16 +405,16 @@ function tdCandidates(c){ if(c.catalogId&&c.tcg==="pokemon") return [c.catalogId
   if(a==="me"&&n==="55") return ["30th-"+num.padStart(3,"0"),"30th-"+num]; const sets=n?[...new Set([a+n.padStart(2,"0")+half,a+n+half])]:[a]; const nums=[...new Set([num,num.padStart(3,"0")])]; const out=[]; for(const st of sets) for(const k of nums) out.push(st+"-"+k); return out; }
 async function tdCard(id){ const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),10000); try{ const r=await fetch(TD+"/cards/"+encodeURIComponent(id),{signal:ctl.signal}); if(r.status===404) return null; if(!r.ok) throw new Error("http"); const j=await r.json(); return j&&j.id?j:null; } finally{ clearTimeout(t); } }
 async function marketFor(c){
-  const key=c.tcg+"|"+(c.catalogId||c.id||"")+"|"+(c.number||"")+"|"+(c.name||""); if(MK.cache[key]) return MK.cache[key];
+  const key=c.tcg+"|"+(c.catalogId||c.id||"")+"|"+(c.number||"")+"|"+(c.name||"")+"|"+(c.finish||""); if(MK.cache[key]) return MK.cache[key];
   const out={raw:null,rows:[],source:"",asOf:"",note:"",links:compLinks(c)};
   if(c.tcg==="naruto"||c.tcg==="kpdh"){ const kp=REF.kayouPrice||{}, cat={priceSource:kp.source,priceAsOf:kp.asOf,priceUrl:REF.artCredit.url}, list=Object.keys(REF.catalog||{}).filter(k=>REF.catalog[k].type!=="op").flatMap(k=>expandCatalog(k)||[]), nc=v=>String(v||"").toLowerCase().replace(/\u25c7/g,"d").replace(/[^a-z0-9]/g,""), hit=c.number&&list.find(x=>nc(x.number)===nc(String(c.number).replace(/L\d$/i,"")));
     if(hit&&hit.price){ out.raw=hit.price; out.rows=[["Market, near mint",hit.price]]; out.source=cat.priceSource; out.asOf=cat.priceAsOf; out.links.unshift(["DeckTradr",cat.priceUrl]); }
     else out.note = hit ? "No recent sales recorded for this card yet." : c.number ? "No market data for this card code." : "Add the card code to get a market value."; }
   else if(c.tcg==="pokemon"){ if(S.mode==="cloud"){ out.note="Live Pokémon prices load on the hosted site."; return out; }
     try{ let d=null; for(const id of tdCandidates(c)){ d=await tdCard(id); if(d) break; }
-      if(d&&d.pricing){ const tp=d.pricing.tcgplayer||{}, cm=d.pricing.cardmarket; const vs=Object.keys(tp).filter(k=>tp[k]&&typeof tp[k]==="object"&&tp[k].marketPrice!=null); const pick=vs.includes("normal")?"normal":vs.includes("holofoil")?"holofoil":vs[0];
+      if(d&&d.pricing){ const tp=d.pricing.tcgplayer||{}, cm=d.pricing.cardmarket; const vs=Object.keys(tp).filter(k=>tp[k]&&typeof tp[k]==="object"&&tp[k].marketPrice!=null); const want=c.finish&&vs.includes(c.finish)?c.finish:"", pick=want||(vs.includes("normal")?"normal":vs.includes("holofoil")?"holofoil":vs[0]); if(c.finish&&!want&&pick) out.note="No price for the "+lab(FIN.pokemon,c.finish)+" finish. Showing "+pick.replace(/-/g," ")+"."; else if(!c.finish&&vs.length>1) out.note="This card has "+vs.length+" finishes with different prices. Pick yours under This copy.";
         vs.forEach(k=>out.rows.push(["TCGplayer "+k.replace(/-/g," "),tp[k].marketPrice,tp[k].lowPrice,tp[k].highPrice])); if(pick){ out.raw=tp[pick].marketPrice; out.source="TCGplayer market"; out.asOf=String(tp.updated||"").slice(0,10); }
-        if(cm&&cm.trend!=null) out.rows.push(["Cardmarket trend, euros",cm.trend,null,null,"EUR"]); out.catalogId=d.id; if(!out.rows.length) out.note="No price listed for this card."; }
+        if(cm&&cm.trend!=null) out.rows.push(["Cardmarket trend, euros",cm.trend,null,null,"EUR"]); out.catalogId=d.id; if(!out.rows.length) out.note="No price listed for this card."; if(pick) out.finish=pick; }
       else out.note = d ? "No price listed for this card." : "This card could not be matched to the price database."; }
     catch(e){ out.note="Prices could not be reached. Try again in a minute."; return out; } }
   else if(c.tcg==="yugioh"){ if(S.mode==="cloud"){ out.note="Live Yu-Gi-Oh! prices load on the hosted site."; return out; }
@@ -503,13 +512,13 @@ function vFind(){
 }
 function findSearch(){
   const s=S.search, q=s.q.trim().toLowerCase();
-  const mine = q ? cards().filter(c=>[c.name,c.character,c.set,c.number].join(" ").toLowerCase().includes(q)).slice(0,25) : [];
+  const mineAll = q ? cards().filter(c=>[c.name,c.character,c.set,c.number,c.rarity,...copyBits(c)].join(" ").toLowerCase().includes(q)) : [], mine = s.mineAll ? mineAll : mineAll.slice(0,25);
   return `<div class="row"><input type="search" id="sq" class="grow" placeholder="Card name, character or number" value="${esc(s.q)}">
     <select id="stcg" style="width:auto">${REF.tcgs.map(t=>`<option value="${t.id}" ${s.tcg===t.id?"selected":""}>${esc(t.label)}</option>`).join("")}</select>
     <button class="btn pri" data-act="do-search" ${s.busy?"disabled":""}>${s.busy?"Searching":"Search"}</button></div>
-  ${q?`<h3 style="margin:16px 0 8px">In your vault (${mine.length})</h3>${mine.length?`<div class="list">${mine.map(cardRow).join("")}</div>`:`<p class="muted">Nothing in the vault matches.</p>`}`:`<p class="muted" style="margin-top:12px">Search checks your own vault first, then the card catalog for the game you pick.</p>`}
+  ${q?`<h3 style="margin:16px 0 8px">In your vault (${mineAll.length})</h3>${mine.length?`<div class="list">${mine.map(cardRow).join("")}</div>${mineAll.length>mine.length?`<p><button class="btn" data-act="mine-all">Show all ${mineAll.length}</button></p>`:""}`:`<p class="muted">Nothing in the vault matches.</p>`}`:`<p class="muted" style="margin-top:12px">Search checks your own vault first, then the card catalog for the game you pick.</p>`}
   ${s.note?`<p class="note" style="margin-top:14px">${esc(s.note)}</p>`:""}
-  ${s.results?`<h3 style="margin:16px 0 8px">Catalog (${s.results.length})</h3>${s.results.length?`<div class="gallery">${s.results.map((r,i)=>`<div class="hit" style="--tc:${tcgOf(r.tcg).accent};cursor:default"><span class="art">${esc(SHORT[r.tcg]||"")}${r.img||r.imageUrl?`<img src="${esc(r.img||r.imageUrl)}" alt="${esc(r.name)}" loading="lazy" onerror="this.remove()">`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(r.name)}</b><span class="muted small" style="display:block">${esc([r.set,r.number].filter(Boolean).join(" · "))}</span>${r.raw!=null?`<span class="pill">${money(r.raw)} est.</span>`:""}<span style="display:block;margin-top:8px"><button class="btn pri" data-act="add-result" data-i="${i}">Add</button></span></span></div>`).join("")}</div>`:`<p class="muted">No catalog matches. You can still add it by hand.</p>`}`:""}
+  ${s.results?`<h3 style="margin:16px 0 8px">Catalog (${s.total?`showing ${s.results.length} of ${s.total}`:s.results.length+(s.more?", more available":"")})</h3>${s.results.length?`<div class="gallery">${s.results.map((r,i)=>`<div class="hit" style="--tc:${tcgOf(r.tcg).accent};cursor:default"><span class="art">${esc(SHORT[r.tcg]||"")}${r.img||r.imageUrl?`<img src="${esc(r.img||r.imageUrl)}" alt="${esc(r.name)}" loading="lazy" onerror="this.remove()">`:""}</span><span class="cap" style="display:block"><b style="overflow-wrap:anywhere">${esc(r.name)}</b><span class="muted small" style="display:block">${esc([r.set,r.number].filter(Boolean).join(" · "))}</span>${r.raw!=null?`<span class="pill">${money(r.raw)} est.</span>`:""}<span style="display:block;margin-top:8px"><button class="btn pri" data-act="add-result" data-i="${i}">Add</button></span></span></div>`).join("")}</div>${s.more?`<p><button class="btn" data-act="search-more" ${s.busy?"disabled":""}>${s.busy?"Loading":"Load more results"}</button></p>`:""}`:`<p class="muted">No catalog matches. You can still add it by hand.</p>`}`:""}
   <p style="margin-top:16px"><button class="btn" data-act="new-card">Add a card by hand</button></p>`;
 }
 function findScan(){
@@ -694,7 +703,7 @@ async function fillSetPrices(){ const o=S.setOpen; if(!o||o.tcg!=="pokemon"||S.m
 async function loadLiveSets(tcg){
   if(S.liveSets[tcg]||API.busy["s"+tcg]||S.net==="blocked") return; API.busy["s"+tcg]=1;
   try{
-    if(tcg==="pokemon"){ const j=await getJSON(TD+"/sets?sort:field=releaseDate&sort:order=DESC&pagination:itemsPerPage=90"); S.liveSets.pokemon=j.filter(x=>!/^[AB]\d|^P-/.test(x.id)).map(x=>({id:x.id,name:x.name,era:"",when:"",total:x.cardCount&&x.cardCount.total,logo:x.logo?x.logo+".png":""})); API.setNames=Object.fromEntries(j.map(x=>[x.id,x.name])); }
+    if(tcg==="pokemon"){ const j=await getJSON(TD+"/sets?sort:field=releaseDate&sort:order=DESC&pagination:itemsPerPage=250"); S.liveSets.pokemon=j.filter(x=>!/^[AB]\d|^P-/.test(x.id)).map(x=>({id:x.id,name:x.name,era:"",when:"",total:x.cardCount&&x.cardCount.total,logo:x.logo?x.logo+".png":""})); API.setNames=Object.fromEntries(j.map(x=>[x.id,x.name])); }
     else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardsets.php"); S.liveSets.yugioh=(j||[]).filter(x=>x.tcg_date).sort((a,b)=>b.tcg_date.localeCompare(a.tcg_date)).slice(0,60).map(x=>({name:x.set_name,era:x.set_code,when:x.tcg_date.slice(0,7),total:x.num_of_cards,logo:x.set_image||""})); }
     netOk(); if(S.view==="sets"&&!S.setOpen&&!sheetOpen()) render();
   }catch(e){ if(netFail()) setTimeout(()=>{ if(S.view==="sets") loadLiveSets(tcg); },retryIn()); }
@@ -707,7 +716,7 @@ async function loadSetCards(){
   try{ let list=[], meta={};
     if(o.tcg==="pokemon"){ const j=await getJSON(TD+"/sets/"+encodeURIComponent(o.id)); list=(j.cards||[]).map(c=>({id:c.id,name:c.name,number:c.localId,img:c.image?c.image+"/low.webp":"",big:c.image?c.image+"/high.webp":""})).reverse(); meta={when:j.releaseDate||"",era:j.serie&&j.serie.name||""}; }
     else if(op){ const code=REF.catalog[o.catalog].code, j=await opSet(code); list=j.map(c=>({id:c.card_image_id||c.card_set_id,name:opName(c),number:c.card_set_id,rarity:c.rarity||"",price:num(c.market_price)||null,asOf:c.date_scraped||"",img:c.card_image||"https://images.scrydex.com/onepiece/"+c.card_set_id+"/small",big:c.card_image||"https://images.scrydex.com/onepiece/"+c.card_set_id+"/large"})).sort((a,b)=>(b.price||0)-(a.price||0)||a.number.localeCompare(b.number)); }
-    else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?num=90&offset=0&cardset="+encodeURIComponent(o.name)); list=(j.data||[]).map(c=>{ const cs=(c.card_sets||[]).find(x=>x.set_name===o.name)||{}, im=(c.card_images||[])[0]||{}; return {id:String(c.id),name:c.name,number:cs.set_code||"",rarity:cs.set_rarity||"",price:num(cs.set_price)||null,img:im.image_url_small||"",big:im.image_url||""}; }); }
+    else { const j=await getJSON("https://db.ygoprodeck.com/api/v7/cardinfo.php?num=400&offset=0&cardset="+encodeURIComponent(o.name)); list=(j.data||[]).map(c=>{ const cs=(c.card_sets||[]).find(x=>x.set_name===o.name)||{}, im=(c.card_images||[])[0]||{}; return {id:String(c.id),name:c.name,number:cs.set_code||"",rarity:cs.set_rarity||"",price:num(cs.set_price)||null,img:im.image_url_small||"",big:im.image_url||""}; }); }
     API.setCards[key]={cards:list,meta}; netOk();
   }catch(e){ API.setCards[key]={cards:[],err:true}; if(op) return; setTimeout(()=>{ delete API.setCards[key]; },20000); }
   if(S.view==="sets"&&!sheetOpen()) render();
@@ -765,6 +774,12 @@ function drawCardSheet(){
      <label class="f">Rarity<input type="text" id="cRarity" list="rarList" value="${esc(c.rarity)}"><datalist id="rarList">${(REF.rarities[c.tcg]||[]).map(r=>`<option value="${esc(r)}">`).join("")}</datalist></label></div>
    <div class="grid3"><label class="f">Pulled from<select id="cProduct"><option value="">${ps.length?"Not from a tracked product":"No "+esc(tcgOf(c.tcg).label)+" products in your Rip log yet"}</option>${ps.map(p=>`<option value="${p.id}" ${c.productId===p.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>
      <label class="f">Pack number<input type="number" inputmode="numeric" id="cPack" value="${c.pack??""}"></label><label class="f">Quantity<input type="number" inputmode="numeric" id="cQty" value="${c.qty||1}"></label></div>
+   <details class="inset" ${c.finish||c.condition||c.language||c.grade?"open":""}><summary><b>This copy</b> <span class="muted small">${esc(copyBits(c).join(", ")||"finish, condition, language, grade")}</span></summary>
+     <div class="grid2" style="margin-top:8px"><label class="f">Finish<select id="cFinish"><option value="">Not set</option>${finOpts(c.tcg).map(([k,l])=>`<option value="${k}" ${c.finish===k?"selected":""}>${l}</option>`).join("")}</select></label>
+       <label class="f">Condition<select id="cCond"><option value="">Not set</option>${COND.map(([k,l])=>`<option value="${k}" ${c.condition===k?"selected":""}>${l}</option>`).join("")}</select></label>
+       <label class="f">Language<select id="cLang"><option value="">Not set</option>${LANG.map(([k,l])=>`<option value="${k}" ${c.language===k?"selected":""}>${l}</option>`).join("")}</select></label>
+       <label class="f">Grade, if slabbed<input type="text" id="cGrade" value="${esc(c.grade||"")}" placeholder="e.g. PSA 10"></label></div>
+     <span class="muted small">${c.tcg==="pokemon"?"Market value follows the finish you pick. ":""}Market quotes are for near mint, ungraded copies.</span></details>
    <div class="inset"><b>Serial number</b>${rule.mode==="never"?`<span class="muted small">This card has no numbered version, so there is nothing to check.</span>`:rule.mode==="always"?seg("serial",[["unverified","Stamp not recorded"],["yes","Record my number"]],c.serial==="yes"?"yes":"unverified"):seg("serial",[["unverified","Unverified"],["yes","Numbered"],["no","Not numbered"]],c.serial)}
      ${rule.mode==="never"?"":c.serial==="yes"?`<div class="grid2"><label class="f">Your copy<input type="text" id="cSerialNo" value="${esc(c.serialNo)}" placeholder="e.g. 042"></label><label class="f">Out of<input type="text" id="cSerialRun" value="${esc(rule.run||c.serialRun)}" placeholder="e.g. 220" ${rule.run?"readonly":""}></label></div>`:rule.mode==="always"?`<span class="muted small">Every ${esc(c.rarity)} in this set is numbered out of ${rule.run}. Record your stamp when you have the card in hand.</span>`:c.serial==="unverified"?`<span class="muted small">Stays flagged until you check it. The Serial check tab walks you through it.</span>`:""}</div>
    <div class="inset"><b>Market value</b><div id="mkt" class="stack" style="gap:8px">${marketHtml(draft.market)}</div></div>
@@ -785,6 +800,7 @@ function readCardForm(){
   { const typed=num(g("cRaw")); if(c.rawSource==="market"&&typed!==c.raw) c.rawSource="mine"; }
   set("productId",g("cProduct")); c.pack=num(g("cPack")); c.qty=Math.max(1,Math.round(num(g("cQty"))||1)); c.raw=num(g("cRaw")); c.bgs=num(g("cBgs"));
   if(g("cSerialNo")!==undefined){ c.serialNo=g("cSerialNo"); c.serialRun=g("cSerialRun"); }
+  { const f0=c.finish||""; set("finish",g("cFinish")); set("condition",g("cCond")); set("language",g("cLang")); set("grade",g("cGrade")); if(c.finish&&!finOpts(c.tcg).some(o=>o[0]===c.finish)) c.finish=""; if((c.finish||"")!==f0) draft.finChanged=true; }
   c.toploaded=$("#cTop").checked; c.isHit=$("#cHit").checked; set("notes",g("cNotes"));
 }
 async function saveCard(){
@@ -859,15 +875,16 @@ Rules: use "" for anything you cannot read. Never guess a serial number, a print
 }
 
 /* ---------- catalog search ---------- */
-async function doSearch(){
-  const s=S.search; s.q=($("#sq")||{}).value||s.q; s.tcg=($("#stcg")||{}).value||s.tcg; const q=s.q.trim(); if(!q){ toast("Type something to search for."); return; }
-  s.busy=true; s.results=null; s.note=""; render();
+async function doSearch(more){
+  const s=S.search; if(!more){ s.q=($("#sq")||{}).value||s.q; s.tcg=($("#stcg")||{}).value||s.tcg; } const q=s.q.trim(); if(!q){ toast("Type something to search for."); return; }
+  const prev=more&&s.results?s.results:[]; if(!more){ s.results=null; s.page=1; s.total=0; s.more=false; s.mineAll=false; } else s.page=(s.page||1)+1; const PER=60;
+  s.busy=true; s.note=""; render();
   let out=null;
   if(S.net!=="blocked" && (s.tcg==="pokemon"||s.tcg==="yugioh")){
     try{
-      if(s.tcg==="pokemon"){ if(!API.setNames) await loadLiveSets("pokemon"); const j=await getJSON(TD+"/cards?name="+encodeURIComponent(q)+"&sort:field=set.releaseDate&sort:order=DESC&pagination:itemsPerPage=40");
+      if(s.tcg==="pokemon"){ if(!API.setNames) await loadLiveSets("pokemon"); const j=await getJSON(TD+"/cards?name="+encodeURIComponent(q)+"&sort:field=set.releaseDate&sort:order=DESC&pagination:itemsPerPage="+PER+"&pagination:page="+s.page); s.more=j.length===PER;
         out=j.filter(c=>!/^[AB]\d|^P-/.test(c.id)).map(c=>{ const sid=c.id.slice(0,c.id.lastIndexOf("-")); return {tcg:"pokemon",name:c.name,set:(API.setNames&&API.setNames[sid])||"",number:c.localId,rarity:"",img:c.image?c.image+"/low.webp":"",imageUrl:c.image?c.image+"/high.webp":"",raw:null,tdId:c.id}; }); }
-      else { const r=await fetch("https://db.ygoprodeck.com/api/v7/cardinfo.php?num=30&offset=0&fname="+encodeURIComponent(q)); const j=await r.json();
+      else { const r=await fetch("https://db.ygoprodeck.com/api/v7/cardinfo.php?num="+PER+"&offset="+((s.page-1)*PER)+"&fname="+encodeURIComponent(q)); const j=await r.json(); s.total=j.meta&&j.meta.total_rows||0; s.more=!!(j.meta&&j.meta.next_page_offset);
         out=(j.data||[]).map(c=>{ const cs=(c.card_sets||[])[0]||{}, p=(c.card_prices||[])[0]||{}; return {tcg:"yugioh",name:c.name,set:cs.set_name||"",number:cs.set_code||"",rarity:cs.set_rarity||"",img:(c.card_images||[])[0]&&c.card_images[0].image_url_small,imageUrl:(c.card_images||[])[0]&&c.card_images[0].image_url,raw:num(p.tcgplayer_price)||null}; }); }
       netOk();
     }catch(e){ netFail(); out=null; }
@@ -880,7 +897,7 @@ async function doSearch(){
       catch(e){ out=[]; s.note="The catalog could not be searched right now. You can still add the card by hand or scan it."; }
     } else { out=[]; s.note = (s.tcg==="pokemon"||s.tcg==="yugioh") ? "The live catalog could not be reached. Add the card by hand or scan it." : "There is no public catalog for this game yet. Add the card by hand or scan it."; }
   }
-  s.results=out; s.busy=false; render();
+  if(more&&(!out||!out.length)&&prev.length){ s.more=false; out=[]; } s.results=prev.concat(out||[]); s.busy=false; render();
 }
 
 /* ---------- import / export ---------- */
@@ -892,9 +909,9 @@ function parseCSV(text){
 function mapRows(rows){
   if(rows.length<2) return []; const hd=rows[0].map(h=>h.trim().toLowerCase());
   const col=(...keys)=>{ for(const k of keys){ const i=hd.findIndex(h=>h===k); if(i>=0) return i; } for(const k of keys){ const i=hd.findIndex(h=>h.includes(k)); if(i>=0) return i; } return -1; };
-  const ix={name:col("name","card name","card","product name","title"),set:col("set","set name","expansion","series"),number:col("number","card number","no.","collector number","#"),qty:col("quantity","qty","count","owned"),cond:col("condition","grade"),rar:col("rarity"),price:col("market price","price","value","market","unit price")};
+  const ix={name:col("name","card name","card","product name","title"),set:col("set","set name","expansion","series"),number:col("number","card number","no.","collector number","#"),qty:col("quantity","qty","count","owned"),cond:col("condition"),grade:col("grade","grading"),fin:col("finish","printing","variant","foil","edition"),lang:col("language","lang"),rar:col("rarity"),price:col("market price","price","value","market","unit price")};
   if(ix.name<0) return [];
-  return rows.slice(1).map(r=>({name:(r[ix.name]||"").trim(),set:ix.set>=0?(r[ix.set]||"").trim():"",number:ix.number>=0?(r[ix.number]||"").trim():"",qty:Math.max(1,Math.round(num(ix.qty>=0?r[ix.qty]:1)||1)),condition:ix.cond>=0?(r[ix.cond]||"").trim():"",rarity:ix.rar>=0?(r[ix.rar]||"").trim():"",raw:ix.price>=0?num(r[ix.price]):null})).filter(r=>r.name);
+  return rows.slice(1).map(r=>({name:(r[ix.name]||"").trim(),set:ix.set>=0?(r[ix.set]||"").trim():"",number:ix.number>=0?(r[ix.number]||"").trim():"",qty:Math.max(1,Math.round(num(ix.qty>=0?r[ix.qty]:1)||1)),condition:ix.cond>=0?(r[ix.cond]||"").trim():"",grade:ix.grade>=0?(r[ix.grade]||"").trim():"",finish:ix.fin>=0?(r[ix.fin]||"").trim():"",language:ix.lang>=0?(r[ix.lang]||"").trim():"",rarity:ix.rar>=0?(r[ix.rar]||"").trim():"",raw:ix.price>=0?num(r[ix.price]):null})).filter(r=>r.name);
 }
 async function impPreview(){
   const f=$("#impFile").files[0]; let text=$("#impText").value; if(f){ try{ text=await f.text(); }catch(e){ S.imp.msg="That file could not be read."; render(); return; } }
@@ -903,7 +920,7 @@ async function impPreview(){
 }
 async function impGo(){
   const im=S.imp; if(!im.rows) return; im.busy=true; im.done=0; im.total=im.rows.length; render(); let fail=0;
-  const mk=r=>({id:uid("c_"),createdAt:Date.now(),tcg:im.tcg,owner:im.owner,name:r.name,set:r.set,number:r.number,qty:r.qty,rarity:r.rarity,raw:r.raw,rawStatus:r.raw!=null?"estimate":"unverified",bgsStatus:"unverified",serial:"no",decision:"undecided",reasons:[],notes:r.condition?"Condition: "+r.condition:"",source:"import"});
+  const mk=r=>({id:uid("c_"),createdAt:Date.now(),tcg:im.tcg,owner:im.owner,name:r.name,set:r.set,number:r.number,qty:r.qty,rarity:r.rarity,raw:r.raw,rawStatus:r.raw!=null?"estimate":"unverified",bgsStatus:"unverified",serial:"no",decision:"undecided",reasons:[],condition:normCond(r.condition),finish:normFin(im.tcg,r.finish),language:normLang(r.language),grade:r.grade||(r.condition&&!normCond(r.condition)&&/\d/.test(r.condition)?r.condition:""),notes:[r.condition&&!normCond(r.condition)&&!/\d/.test(r.condition)?"Condition: "+r.condition:"",r.finish&&!normFin(im.tcg,r.finish)?"Finish: "+r.finish:""].filter(Boolean).join(". "),source:"import"});
   if(S.mode==="local"){ im.rows.forEach(r=>{ const c=mk(r); S.cards.set(c.id,c); }); saveLocal(); im.done=im.total; }
   else { for(const r of im.rows){ const c=mk(r), {id,...data}=c; let ok=false; for(let t=0;t<2&&!ok;t++){ try{ await db.doc("cards/"+id).set(data); ok=true; }catch(e){ if(e&&e.code==="resource_exhausted") await new Promise(z=>setTimeout(z,2500)); else break; } } if(!ok) fail++; im.done++; if(im.done%10===0){ const p=document.querySelector("progress"); if(p) p.value=im.done; } } }
   im.busy=false; im.msg = fail ? `Imported ${im.total-fail} cards. ${fail} did not save, so run the import again later for those.` : `Imported ${im.total} cards.`; im.rows=null; render();
@@ -911,7 +928,7 @@ async function impGo(){
 async function exportFile(kind){
   let data, name; const d=new Date().toISOString().slice(0,10);
   if(kind==="json"){ data=JSON.stringify({exportedAt:d,cards:cards(),products:products(),watch:[...S.watch.values()],settings:S.settings},null,1); name=`card-vault-backup-${d}.json`; }
-  else { const cols=["tcg","owner","name","character","set","number","rarity","qty","serial","serialNo","serialRun","raw","rawStatus","bgs","bgsStatus","toploaded","decision","reasons","notes"]; const q=v=>'"'+String(Array.isArray(v)?v.join("; "):v??"").replace(/"/g,'""')+'"'; data=[cols.join(","),...cards().map(c=>cols.map(k=>q(c[k])).join(","))].join("\n"); name=`card-vault-${d}.csv`; }
+  else { const cols=["tcg","owner","name","character","set","number","rarity","finish","condition","language","grade","qty","serial","serialNo","serialRun","raw","rawStatus","bgs","bgsStatus","toploaded","decision","reasons","notes"]; const q=v=>{ let t=String(Array.isArray(v)?v.join("; "):v??""); if(typeof v==="string"&&/^[=+\-@\t\r]/.test(t)) t="'"+t; return '"'+t.replace(/"/g,'""')+'"'; }; data=[cols.join(","),...cards().map(c=>cols.map(k=>q(c[k])).join(","))].join("\n"); name=`card-vault-${d}.csv`; }
   if(downloads){ try{ await downloads.save({filename:name,data}); toast("Saved."); }catch(e){ if(!e||e.code!=="declined") toast("The file could not be saved here."); } return; }
   if(S.mode==="local"){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([data],{type:"text/plain"})); a.download=name; document.body.appendChild(a); a.click(); a.remove(); return; }
   try{ await navigator.clipboard.writeText(data); toast("Copied to the clipboard."); }catch(e){ toast("Export is not available in this view."); }
@@ -958,6 +975,8 @@ document.addEventListener("click", async e=>{
   else if(a==="set-more"){ S.setMore=(S.setMore||60)+60; render(); }
   else if(a==="add-setcard"){ const o=S.setOpen, d=o&&setData(o), cc=d&&d.cards&&d.cards[+b.dataset.i]; if(cc) viewSheet(o.tcg,o.name,cc); }
   else if(a==="do-search") doSearch();
+  else if(a==="search-more") doSearch(true);
+  else if(a==="mine-all"){ S.search.mineAll=true; render(); }
   else if(a==="add-result"&&S.search.results[+b.dataset.i]&&S.search.results[+b.dataset.i].tdId){ const r=S.search.results[+b.dataset.i]; viewSheet("pokemon",r.set,{id:r.tdId,name:r.name,number:r.number,big:r.imageUrl,img:r.img}); }
   else if(a==="add-result"){ const r=S.search.results[+b.dataset.i]; if(r) cardSheet({tcg:r.tcg,name:r.name,set:r.set,number:r.number,rarity:r.rarity,imageUrl:r.imageUrl||"",raw:r.raw,rawStatus:r.raw!=null?"estimate":"unverified",serial:r.tcg==="naruto"||r.tcg==="kpdh"?"unverified":"no",source:"search"},true); }
   else if(a==="imp-preview") impPreview();
@@ -975,6 +994,7 @@ document.addEventListener("submit", e=>{ e.preventDefault(); const id=e.target.i
   else if(id==="ownerForm"){ const n=$("#oName").value.trim(); if(!n) return; if(!S.settings.owners.includes(n)) S.settings.owners=[...S.settings.owners,n]; saveSettings().then(()=>{ toast(n+" added."); closeSheet(); }); }
 });
 document.addEventListener("change", e=>{ const t=e.target;
+  if(t.id==="cFinish"&&draft&&draft.kind==="card"){ readCardForm(); draft.market=null; const c=draft.obj; if(c.rawSource==="market"&&c.rawStatus!=="verified") c.raw=null; drawCardSheet(); return; }
   if(t.id==="fDecision"){ S.f.decision=t.value; render(); }
   else if(t.id==="gradeFee"){ S.settings.gradeFee=num(t.value); saveSettings(); if(S.mode==="cloud") render(); }
   else if(t.id==="camIn"||t.id==="libIn") handleScan(t.files[0]);
