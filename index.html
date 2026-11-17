@@ -474,7 +474,7 @@ function vRips(){
         <span class="pill">${packs?`${opened}/${packs} packs opened`:"pack count not set"}</span>${p.cardsPerPack?`<span class="pill">${p.cardsPerPack} cards per pack</span>`:""}</div>
       ${packs?`<progress value="${opened}" max="${packs}" style="margin-top:10px"></progress>`:""}
       ${p.notes?`<p class="muted small" style="margin:8px 0 0">${esc(p.notes)}</p>`:""}
-      <div class="row" style="margin-top:10px"><button class="btn pri" data-act="pull" data-id="${p.id}">Log a pull</button><button class="btn" data-act="pack-plus" data-id="${p.id}">Pack opened +1</button><button class="btn ghost" data-act="edit-product" data-id="${p.id}">Edit</button></div>
+      <div class="row" style="margin-top:10px"><button class="btn pri" data-act="pull" data-id="${p.id}">Log a pull</button><label class="btn pri" for="ps_${p.id}">Scan a pull</label><input type="file" class="pullScan" id="ps_${p.id}" data-id="${p.id}" accept="image/*" hidden><button class="btn" data-act="pack-plus" data-id="${p.id}">Pack opened +1</button><button class="btn ghost" data-act="edit-product" data-id="${p.id}">Edit</button></div>${S.scan.pid===p.id&&(S.scan.busy||S.scan.msg)?`<div class="note" style="margin-top:8px">${esc(S.scan.msg)}${S.scan.busy?"<progress></progress>":""}</div>`:""}
       ${mine.length?`<div class="stack" style="margin-top:12px">${mine.map(c=>`<div class="small muted" style="margin-bottom:-6px">${c.pack?`Pack ${c.pack}`:"Pack not noted"}${c.isHit?" · hit":""}</div>${cardRow(c)}`).join("")}</div>`:`<p class="muted small" style="margin:10px 0 0">No pulls logged for this one yet.</p>`}
     </section>`; }).join("")
     : `<div class="empty">No products yet.<br><br><button class="btn pri" data-act="seed-naruto">Set up my three Chapter Jin collector boxes</button></div>`;
@@ -955,16 +955,17 @@ async function claudeRead(blob){ let guess={}, note="";
     try{ const r=await aiJson(readPrompt(),[blob]); if(r&&typeof r==="object") guess=Array.isArray(r)?(r[0]||{}):r; note=readNote(guess); }
     catch(e){ const c=e&&e.code; note = c==="not_granted"||c==="sampling_disabled" ? "Card reading is switched off for this visit, so fill in the details by hand." : sample&&sampleImages ? (c==="rate_limited"?"Claude is busy right now. Try again in a bit.":"Claude could not be reached for this photo. Try again.")+" The photo is attached." : aiWhy(e)+" The photo is attached."; }
   return {guess,note}; }
-async function handleScan(file){
-  if(!file) return; S.scan={busy:true,msg:"Getting the photo ready."}; render();
-  let blob; try{ blob=await shrink(file,1800,.9); }catch(e){ S.scan={busy:false,msg:e.message||"That photo could not be read. Try another."}; render(); return; }
+async function handleScan(file,prod){
+  if(!file) return; const pid=prod?prod.id:null; S.scan={busy:true,msg:"Getting the photo ready.",pid}; render();
+  let blob; try{ blob=await shrink(file,1800,.9); }catch(e){ S.scan={busy:false,msg:e.message||"That photo could not be read. Try another.",pid}; render(); return; }
   let guess={}, note="";
   if(hasAI()){ S.scan.msg=aiName()+" is reading the card. This can take up to a minute."; render(); ({guess,note}=await claudeRead(blob)); }
-  else note="Photo attached. Fill in the details from the card.";
+  else note=prod?"Photo attached. Tap Pick the card to choose it from the set, or turn on the free card reader under Search, Scan to have pulls read automatically.":"Photo attached. Fill in the details from the card.";
   S.scan={busy:false,msg:""}; pendingPhoto=blob;
   const str=v=>typeof v==="string"?v.trim():"";
   const c={tcg:REF.tcgs.some(t=>t.id===guess.tcg)?guess.tcg:(S.f.tcg!=="all"?S.f.tcg:"naruto"),name:str(guess.name),character:str(guess.character),set:str(guess.set),number:str(guess.number),rarity:str(guess.rarity),
     serial: guess.serialVisible==="yes"&&str(guess.serialNo) ? "yes" : guess.serialVisible==="no" ? "no" : "unverified", serialNo:str(guess.serialNo), serialRun:str(guess.serialRun), source:"scan", isHit:true, notes:""};
+  if(prod){ c.tcg=prod.tcg; c.productId=prod.id; c.pack=Math.max(1,prod.packsOpened||1); c.source="pull"; if(prod.set&&!codeParts(c.number).prefix) c.set=prod.set; else if(!c.set&&prod.set) c.set=prod.set; }
   cardSheet(c,true); pendingPhoto=blob; { const o=draft.obj, so=setObj(o); if(so) o.set=so.name; const matched=matchCatalog(o); draft.photoNote=note+(matched?" Matched to "+o.number+" in the set list.":draft.cands&&setObj(o)?" "+draft.cands+" possible matches in "+o.set+". Tap Pick the card to choose.":draft.cands?" Choose the set, then tap Pick the card to see the likely matches.":""); draft.market=null; }
   drawCardSheet(); pendingPhoto=blob;
 }
@@ -1103,6 +1104,7 @@ document.addEventListener("change", e=>{ const t=e.target;
   if(t.id==="fDecision"){ S.f.decision=t.value; render(); }
   else if(t.id==="gradeFee"){ S.settings.gradeFee=num(t.value); saveSettings(); if(S.mode==="cloud") render(); }
   else if(t.id==="camIn"||t.id==="libIn") handleScan(t.files[0]);
+  else if(t.classList&&t.classList.contains("pullScan")) handleScan(t.files[0],S.products.get(t.dataset.id));
   else if(t.id==="sheetIn") sheetPick(t.files[0]);
   else if(t.id==="bakFile") restoreBackup(t.files[0]);
   else if(t.id==="sheetLay"){ const [c,r]=t.value.split("x").map(Number); Object.assign(S.sheet,{lay:t.value,cols:c,rows:r,cells:null}); render(); }
